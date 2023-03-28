@@ -1,6 +1,6 @@
 ---
 title: "Plotting global models outputs"
-author: "Camilla Novaglio & Derek Tittensor"
+author: "Camilla Novaglio & Derek Tittensor And Juliano And Andrea :)"
 date: "04/11/2020"
 output: html_document
 editor_options: 
@@ -13,59 +13,64 @@ Step 1 extracts ocean biomass from MEMs netcdfs and collapses them into a time-a
 Step 2 extracts ocean biomass from MEMs netcdfs and collapses them into a time-averaged (1990s for the historical period and 2090s for future scenarios) spatial dataset (1 grid cell resolution) for CMIP6.  
 Step 3 load CMIP5 and CMIP6 data, averages the data across MEMs and scenarios and produces Figure 5 along with supplementary figures.  
 
-# STEP 1 extract data CMIP5
+```{r load CMIP6}
 
-## Load libraries for netcdf and define variables
+library(MyFunctions)
 
-```{r load CMIP5}
+packages <- c(
+  "grid", # Read dataframe
+  "zoo", # Read dataframe (Fast!)
+  "viridis",
+  "tidyverse", # for all data wrangling and ggplot
+  "janitor", # for data cleaning
+  "ncdf4", # to order the facet wrap https://juliasilge.com/blog/reorder-within/
+  "patchwork", # for figures 1 and 3
+  # "ggimage", #for reading images to the circular plot
+  "reshape2", # for nice plot labels
+  # "ggsflabel", # for nice sf_plots labels
+  # "spdep", # for poly2nb old
+  "sf", #Spatial analysis 
+  "sp", #Spatial analysis 
+  # "purrr",#Spatial analysis
+  # "rgdal", #Spatial analysis
+  "tools", #Spatial analysis 
+  "parallel", # for parallelization
+  # "taxize", # For getting species names
+  # "rfishbase", # for species ecosystem affinity
+  "zoo", #for runing mean
+  # "pgirmess", # for dune test after kurtis wallas
+  "rnaturalearth", # For maps
+  "R.matlab" # For Gabs distributions
+)
 
-rm(list=ls())
+my_lib(packages)
 
-install_load <- function (this_package)  {   
+# Fix new updates of sf package
+sf::sf_use_s2(use_s2 = FALSE)
 
-   package <- c(this_package)
-   if(package %in% rownames(installed.packages()))
-        do.call('library', list(package))
-
-    # if package is not installed locally, download, then load
-    else {
-        install.packages(package)
-         do.call("library", list(package))
-    }
-}
-
-### load/install libraries ###
-install_load("grid")
-install_load("zoo")
-install_load("viridis")
-install_load("tidyr")
-install_load("dplyr")
-install_load("ncdf4")
-install_load("ggplot2")
-install_load("patchwork")
 
 ### load helper scripts with functions to extract data from netcdfs ###
 source("R/HelperScripts.r")
 source("R/Funcs_maps.r")
 
 ### create folders where temporary data can be stored ###
-mainDir = "../CMIP5vsCMIP6_data/"
+mainDir = my_path("G", "FishMip/Arctic")
 DirStep1 = "temp_data"
 ifelse(!dir.exists(file.path(mainDir, DirStep1)), dir.create(file.path(mainDir, DirStep1)), FALSE)
 
 ### define variables ###
-cmip<-c("CMIP5", "CMIP6")
-mod_ipsl <- c("APECOSM", "BOATS", "DBEM", "DBPM","EcoOcean", "MACROECOLOGICAL")
-mod_gfdl <- c("BOATS", "DBEM", "EcoOcean", "MACROECOLOGICAL")
-protocol <- c("picontrol","historical", "future")
+cmip <- "cmip6"
+mod_ipsl <- c("APECOSM", "BOATS", "DBEM", "DBPM","EcoOcean", "MACROECOLOGICAL", "FEISTY","ZooMSS","EcoTroph")
+mod_gfdl <- c("BOATS", "DBEM", "EcoOcean", "MACROECOLOGICAL", "FEISTY","ZooMSS","EcoTroph")
+protocol <- c("historical", "future")
 future<-c("SSP126", "SSP585")
-variable_to_extract <-c("tcb","tpb", "bp30cm", "bp30to90cm", "bp90cm")
+variable_to_extract <- "tcb"
 
 ### create folders where figures can be saved ###
-mainDir = "../CMIP5vsCMIP6_data/"
+# mainDir = "../CMIP5vsCMIP6_data/"
 DirStep2 = "figures"
 ifelse(!dir.exists(file.path(mainDir, DirStep2)), dir.create(file.path(mainDir, DirStep2)), FALSE)
-save_loc<-"../CMIP5vsCMIP6_data/figures/"
+save_loc <- my_path("G", "FishMip/Arctic/figures")
 
 ```
 
