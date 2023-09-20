@@ -57,7 +57,7 @@ models_df <- bind_rows(hist_df,future_df)
 
 historic_data <- models_df %>% 
   filter(scen == "historical",
-         year >1994) %>% 
+         year > 1995) %>% 
   group_by(lat,lon,esm,mem) %>% 
   summarise(mean_hist = mean(mean_tcb, na.rm = T),
             sd_hst = sd(mean_tcb, na.rm = T)
@@ -66,13 +66,14 @@ historic_data <- models_df %>%
 
 delta_df <- models_df  %>% 
   filter(scen != "historical",
-         year > 2021 & year < 2040) %>% 
+         year > 2030 & year < 2049) %>% 
   group_by(lat,lon,esm,mem) %>% 
   summarise(period_mean = mean(mean_tcb,na.rm= T)) %>% 
   left_join(historic_data,
             by = join_by("lon", "lat", "esm", "mem")
   ) %>% 
-  mutate(change = period_mean-mean_hist) %>%
+  # mutate(change = period_mean-mean_hist) %>%
+  mutate(change = ((period_mean-mean_hist)/mean_hist)*100) %>%
   group_by(lat,lon,esm) %>% 
   summarise(
     mean_mem = mean(change,na.rm = T),
@@ -85,7 +86,11 @@ delta_df <- models_df  %>%
     cols = c(mean_mem,sd_mem)
     )
 
-delta_df
+# 
+max(delta_df$n_mems)
+
+unique(models_df$mem)
+
 ```
 
 
@@ -175,8 +180,10 @@ ggplot() +
             aes(
               x = lon,
               y =lat,
-              fill = log10(value),
-              color = log10(value)
+              fill = value,
+              color = value
+              # fill = log10(value),
+              # color = log10(value)
             )
             ) +
   geom_polygon(data = map_data("world"),
@@ -212,3 +219,18 @@ ggplot() +
   
 
 ```
+
+
+# Large marine ecosystem
+
+```{r}
+
+meow <- MyFunctions::my_sf("MEOW")
+
+ggplot(meow) + 
+  geom_sf(aes(fill = ecoregion)) +
+  theme(legend.position = "") +
+  coord_sf(ylim = c(66,90)) 
+
+```
+
