@@ -1,0 +1,214 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-09-19"
+---
+
+
+## Loading R libraries
+
+```{r results = "hide", warnings = F, message = F, eval = F}
+
+# Load needed functions
+source("../functions/load_libraries.R")
+
+load_libs(c(
+  "tidyverse",
+  "ncdf4"
+))
+
+# library(reticulate)
+# library(tidyverse)
+# library(metR)
+# library(lubridate)
+# library(raster)
+# library(sf)
+
+data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/csvs/new_runs"
+
+```
+
+
+# Load Data
+
+```{r load_fishmip_data, eval = T, echo = F, message = F}
+
+# FishMip cmip6 data
+historical_list <- list.files(data_path,full.names = T, pattern = "historical")
+
+hist_df <- bind_rows(
+  lapply(historical_list, read_csv)
+)
+
+model_list <- list.files(data_path,full.names = T, pattern = "ssp585")
+
+future_df <- bind_rows(
+  lapply(model_list, read_csv)
+  )
+
+
+models_df <- bind_rows(hist_df,future_df)
+
+```
+
+# Test plots
+
+```{r}
+
+historic_data <- models_df %>% 
+  filter(scen == "historical",
+         year >1994) %>% 
+  group_by(lat,lon,esm,mem) %>% 
+  summarise(mean_hist = mean(mean_tcb, na.rm = T),
+            sd_hst = sd(mean_tcb, na.rm = T)
+            )
+
+
+delta_df <- models_df  %>% 
+  filter(scen != "historical",
+         year > 2021 & year < 2040) %>% 
+  group_by(lat,lon,esm,mem) %>% 
+  summarise(period_mean = mean(mean_tcb,na.rm= T)) %>% 
+  left_join(historic_data,
+            by = join_by("lon", "lat", "esm", "mem")
+  ) %>% 
+  mutate(change = period_mean-mean_hist) %>%
+  group_by(lat,lon,esm) %>% 
+  summarise(
+    mean_mem = mean(change,na.rm = T),
+    sd_mem = sd(change,na.rm = T),
+    n_mems = length(unique(mem)),
+    mems = paste(unique(mem),collapse = ";")
+  ) %>% 
+  filter(n_mems>1) %>% 
+  pivot_longer(
+    cols = c(mean_mem,sd_mem)
+    )
+
+delta_df
+```
+
+
+# Map it
+
+## Generate datasets
+
+```{r}
+
+mean_data <- delta_df %>% 
+  filter(
+         # period == "mid", 
+         !is.na(value),
+         name == "mean_mem",
+         lat > 60
+         )
+
+sd_data <- delta_df %>% 
+  filter(
+         # period == "mid", 
+         !is.na(value),
+         name == "sd_mem",
+         lat > 60
+         )
+
+```
+
+
+## Average map 
+
+```{r}
+
+ggplot() +
+  geom_tile(data = mean_data, 
+            aes(
+              x = lon,
+              y =lat,
+              fill = value,
+              color = value)
+            ) +
+  geom_polygon(data = map_data("world"),
+               aes(long, lat, group = group),
+               fill = "grey50",
+               color = "black") +
+  coord_map("orthographic",ylim = c(70,90)) +
+  scale_color_viridis_b() +
+  scale_fill_viridis_b() +
+  facet_wrap(~esm)
+  
+
+```
+
+## Using countour 
+https://www.rdocumentation.org/packages/metR/versions/0.14.0/topics/geom_contour_fill
+
+```{r}
+
+ggplot() +
+  geom_contour_filled(data = mean_data,
+     aes(
+       x = lon,
+       y = lat,
+       z = value,
+       fill = stat(level)
+     ),
+     bins = 5
+  ) +
+  geom_polygon(data = map_data("world"),
+               aes(long, lat, group = group),
+               fill = "grey50",
+               color = "black") +
+  coord_map("orthographic",ylim = c(70,90)) +
+  # scale_colour_gradient2("Delta Change") +
+  # scale_fill_gradient2("Delta Change")+
+  facet_wrap(~esm)
+  
+
+```
+
+## SD map 
+
+```{r}
+
+
+ggplot() +
+  geom_tile(data = sd_data, 
+            aes(
+              x = lon,
+              y =lat,
+              fill = log10(value),
+              color = log10(value)
+            )
+            ) +
+  geom_polygon(data = map_data("world"),
+               aes(long, lat, group = group),
+               fill = "grey50",
+               color = "black") +
+  coord_map("orthographic",ylim = c(70,90)) +
+  scale_color_viridis_b() +
+  scale_fill_viridis_b() +
+  facet_wrap(~esm)
+  
+
+```
+
+
+```{r}
+
+ggplot() +
+  geom_contour_filled(data = sd_data, 
+     aes(
+       x = lon,
+       y = lat,
+       z = value,
+       fill = stat(level)
+     )
+  ) +
+  geom_polygon(data = map_data("world"),
+               aes(long, lat, group = group),
+               fill = "grey50",
+               color = "black") +
+  coord_map("orthographic",ylim = c(70,90)) +
+  facet_wrap(~esm)
+  
+
+```
