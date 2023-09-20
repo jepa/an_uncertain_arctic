@@ -1,0 +1,91 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-09-20"
+---
+
+
+# Loading R libraries
+
+```{r results = "hide", warnings = F, message = F, eval = F}
+
+
+load_libs(c(
+  "tidyverse",
+  "ncdf4",
+  "metR"
+))
+
+data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs"
+
+```
+
+
+# netcdf to csv
+
+```{r}
+# Build function for extracting files
+cdf_to_csv <- function(file){
+  
+  
+  if(str_detect(file, "126")){
+    ssp <- "126"
+  }
+  
+  if(str_detect(file, "585")){
+    ssp <- "585"
+  }
+  
+  if(str_detect(file, "historical")){
+    ssp <- "historical"
+  }
+  
+  if(str_detect(file, "ipsl")){
+    esm <- "ipsl"
+  }else{
+    esm <- "gfdl"
+  }
+  
+  mem <- str_sub(file,81,84)
+  
+  
+  df_out <- ReadNetCDF(file) %>%
+    filter(lat > 50) %>% 
+    mutate(year = year(time)) %>% 
+    filter(year > 1994) %>% 
+    group_by(lat,lon,year) %>% 
+    summarise_at("tcb",
+                 mean,
+                 na.rm = T) %>% 
+    mutate(esm = esm,
+           mem = mem,
+           ssp = ssp)
+  
+  name <- paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/csvs/new_runs/",mem,"_",ssp,"_",esm,".csv")
+  write_csv(df_out,name)
+  
+}
+```
+
+
+# Run routine
+
+```{r}
+
+# List of fishmip files 
+files <- list.files(paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/netcdf/"),full.names = T)
+
+
+lapply(files, cdf_to_csv)
+
+
+# ggplot(df_out) +
+#   geom_tile(
+#     aes(
+#       x = lon,
+#       y = lat,
+#       fill = tcb
+#     )
+#   )
+```
+
