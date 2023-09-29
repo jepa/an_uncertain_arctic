@@ -1,23 +1,24 @@
 ---
-title: "Untitled"
+title: "Uncerain Arctic main analysis script",
+autors: "Angrea Bryndum-Buchholz, Julia Mason, Juliano Palacios-Abrantes"
 output: html_document
 date: "2023-09-19"
 ---
 
 
-## Loading R libraries
-
-```{r results = "hide", warnings = F, message = F, eval = F}
+```{r results = "hide", warnings = F, message = F, eval = T}
 
 # Load needed functions
 source("../functions/load_libraries.R")
+library(MyFunctions)
 
 load_libs(c(
   "tidyverse",
   "ncdf4",
   "sf",
   "viridis",
-  "wesanderson"
+  "wesanderson",
+  "rlme"
 )
 )
 
@@ -28,13 +29,429 @@ load_libs(c(
 # library(raster)
 # library(sf)
 
-data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/csvs/new_runs"
+# Data path
+data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/csv/"
 
 ```
 
-# MEOW grid
+# Methods
 
-```{r meow_grid, eval = T}
+## Load Data
+
+### LME grid
+
+Data from [Protection Of The Marine Environment: PAME](https://pame.is/projects/ecosystem-approach/arctic-large-marine-ecosystems-lme-s). Large Marine Ecosystems (LMEs) are regions of ocean space of 200,000 km² or greater, that encompass coastal areas from river basins and estuaries to the outer margins of a continental shelf or the seaward extent of a predominant coastal current. LMEs are defined by ecological criteria, including bathymetry, hydrography, productivity, and tropically linked populations. The LME concept for ecosystem-based management has 5-module approach focused on productivity, fish and fisheries, pollution and ecosystem health, socioeconomics, and governance.
+
+```{r lme_grid, eval = T}
+
+# Get Polar Large Marine Ecoregions
+lme_sf <- my_sf("Arctic_LME")
+crs <- st_crs(lme_sf)
+
+unique(lme_sf$lme)
+
+# ggplot(lme_sf) +
+#   geom_sf(aes(fill = lme))
+  # theme(legend.position = "")
+
+# Get world map data and crop it to the polar region
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") %>% 
+  st_transform(world, crs = crs)
+
+fishmip_grid <- read_csv(paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/fishmip_grid_1deg.csv"))
+
+# For some reason DBPM and ZOOMs for IPSL are in another grid account 
+# extra_grid <- read_csv(paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/zoom_dbpm_ipsl_grid_1deg.csv"))
+
+# Rasterize
+
+# All of fishmip
+fishmip_sf <- st_as_sf(fishmip_grid,
+                      coords = c("lon","lat"),
+                      crs = 4326
+                      )
+
+# Join FishMip Meow grid
+fishmip_lme_df <- st_join(fishmip_sf,lme_sf %>% st_transform(crs = 4326)) %>% 
+  as.data.frame() %>% 
+  select(rowid,lme)
+
+unique(fishmip_lme_df$lme)
+
+```
+
+### FishMip data
+
+```{r load_fishmip_data, eval = T, echo = F, message = F}
+
+# FishMip cmip6 data
+historical_list <- list.files(data_path,full.names = T, pattern = "historical")
+
+hist_df <- bind_rows(
+  lapply(historical_list, read_csv)
+)
+
+model_list <- list.files(data_path,full.names = T, pattern = "585")
+
+future_df <- bind_rows(
+  lapply(model_list, read_csv)
+  ) %>% 
+  mutate(ssp = as.character(ssp))
+
+
+all_models <- bind_rows(hist_df,future_df)
+
+unique(all_models$mem)
+unique(all_models$ssp)
+
+# Joint all data needed
+
+models_df <- all_models %>% 
+  left_join(fishmip_grid,
+            by =c("lat", "lon")
+            ) %>% 
+  left_join(fishmip_lme_df,
+            by = "rowid") %>% 
+  group_by(lme,esm,year,mem,ssp) %>% 
+  summarise(tcb = sum(tcb, na.rm = T)) %>% 
+  filter(!is.na(lme))
+
+```
+
+## Proportion change
+
+```{r}
+
+historic_data <- models_df %>% 
+  filter(ssp == "historical",
+         year > 1995) %>% 
+  group_by(lme,esm,mem) %>% 
+  summarise(mean_hist = mean(tcb, na.rm = T),
+            sd_hst = sd(tcb, na.rm = T)
+            )
+
+
+delta_df <- models_df  %>% 
+  filter(ssp != "historical",
+         year > 2030 & year < 2049) %>% 
+  group_by(lme,esm,mem) %>% 
+  summarise(period_mean = mean(tcb,na.rm= T)) %>% 
+  left_join(historic_data,
+            by = join_by("lme", "esm", "mem")
+  ) %>% 
+  # mutate(change = period_mean-mean_hist) %>%
+  mutate(change = ((period_mean-mean_hist)/mean_hist)*100,
+         direction = case_when(
+           change > 0 ~ "Increase",
+           change < 0 ~ "Decrease",
+           TRUE ~ "No Change"
+           )
+         ) %>% 
+  group_by(lme,esm) %>% 
+  summarise(
+    mean_mem = mean(change,na.rm = T),
+    sd_mem = sd(change,na.rm = T),
+    n_mems = length(unique(mem)),
+    mems = paste(unique(mem),collapse = ";"),
+    n_direction = max(sum(direction == "Increase", na.rm = TRUE),sum(direction == "Decrease", na.rm = TRUE))/n_mems) %>% 
+  filter(n_mems>1) %>% 
+  pivot_longer(
+    cols = c(mean_mem,sd_mem,n_direction)
+    )
+
+
+# max(delta_df$n_mems)
+# unique(models_df$mem)
+# unique(models_df$lme)
+
+```
+
+# Results
+
+# All ESMs and all MEMs
+
+```{r}
+
+agg_delta <- delta_df %>% 
+  group_by(lme,name) %>% 
+  summarise(
+    value = mean(value,na.rm = T)
+  )
+```
+
+### Bar plot on mean and sd
+
+```{r}
+
+agg_delta %>%
+  spread(name,value) %>% 
+  # filter(!is.na(lme)) %>% 
+  mutate(flag = ifelse(sd_mem > abs(mean_mem),"Larger","Smaller")) %>% 
+  # View()
+  ggplot() +
+  geom_bar( 
+    aes(
+      y = reorder(lme,mean_mem),
+      x = mean_mem,
+      fill = flag),
+    stat = "identity"
+  ) +
+    geom_errorbar(
+      aes(
+        y = lme,
+        xmin = mean_mem - sd_mem, 
+         xmax = mean_mem + sd_mem#,
+        # color = flag
+        ),
+      color = "black"
+      ) +
+  labs(x = "Change in TCB",
+         y = "lme") +
+  scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
+  scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"))
+
+ggsave(plot = last_plot(),
+       "../figures/lme_agg_bar_flag_85.png",
+       width = 10)
+  
+
+```
+
+
+### Bar plot on direction
+
+```{r}
+
+agg_delta %>%
+  spread(name,value) %>% 
+  filter(!is.na(lme)) %>% 
+  ggplot() +
+  geom_bar( 
+    aes(
+      y = reorder(lme,mean_mem),
+      x = mean_mem,
+      fill = n_direction),
+    stat = "identity"
+  ) +
+  geom_errorbar(
+    aes(
+      y = lme,
+      xmin = mean_mem - sd_mem, 
+      xmax = mean_mem + sd_mem
+    ),
+    color = "grey30"
+  ) +
+  labs(x = "Change in TCB",
+       y = "LME") +
+  scale_fill_viridis("Diection index",
+                     option = "D",
+                     direction = -1,
+                     alpha = 0.8)
+
+ggsave(plot = last_plot(),
+       "../figures/lme_agg_bar_plot_dir_85.png",
+       width = 10)
+  
+```
+
+
+### Maps
+
+Plots maps for average, s.d. and direction change
+
+```{r}
+
+for(i in 1:length(unique(agg_delta$name))){
+  
+  variable <- unique(agg_delta$name)[i]
+  
+  if(variable == "n_direction"){
+    leg_title = "Direction index"
+  }
+  
+  if(variable == "sd_mem"){
+    leg_title = "Variation\n(%)"
+  }
+  
+  if(variable == "mean_mem"){
+    leg_title = "Mean change\n(%)"
+  }
+  
+  
+  figure_name <- paste0("../figures/lme_",variable,"_agg_map_85.png")
+  
+  lme_sf %>% 
+    left_join(agg_delta %>% filter(name == variable)) %>%
+    ggplot() +
+    geom_sf( 
+      aes(
+        fill = value),
+      color = "grey30"
+    ) +
+    geom_sf(data = world,aes(), fill = "antiquewhite")+
+    scale_color_viridis(leg_title, option = "D",direction = -1) +
+    scale_fill_viridis(leg_title, option = "D",direction = -1) +
+    coord_sf(crs = crs, 
+             xlim = c(-2300000, 2300000), 
+             ylim = c(-2300000, 2300000)) +
+    MyFunctions::my_ggtheme_m(map_type = "reg",
+                              leg_pos = "right"
+    ) +
+    theme(axis.text.y = element_blank(),
+          legend.title.align = 0.5
+    )
+  
+  ggsave(plot = last_plot(),
+         figure_name,
+         width = 6,
+         height = 6)
+  
+}
+
+```
+
+
+## By ESM
+
+### Bar plot on mean and sd
+
+```{r}
+
+delta_df %>%
+  spread(name,value) %>% 
+  mutate(flag = ifelse(sd_mem > abs(mean_mem),"Larger","Smaller")) %>% 
+  ggplot() +
+  geom_bar( 
+    aes(
+      y = reorder(lme,mean_mem),
+      x = mean_mem,
+      fill = flag),
+    stat = "identity"
+  ) +
+    geom_errorbar(
+      aes(
+        y = lme,
+        xmin = mean_mem - sd_mem, 
+         xmax = mean_mem + sd_mem
+        ),
+      color = "black"
+      ) +
+  labs(x = "Change in TCB",
+         y = "lme") +
+  scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
+  scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
+  facet_wrap(~esm)
+
+ggsave(plot = last_plot(),
+       "../figures/lme_bar_plot_flag_85.png",
+       width = 10)
+  
+
+```
+
+### Bar plot on direction
+
+```{r}
+
+delta_df %>%
+  spread(name,value) %>% 
+  filter(!is.na(lme)) %>% 
+  ggplot() +
+  geom_bar( 
+    aes(
+      y = reorder(lme,mean_mem),
+      x = mean_mem,
+      fill = n_direction),
+    stat = "identity"
+  ) +
+  geom_errorbar(
+    aes(
+      y = lme,
+      xmin = mean_mem - sd_mem, 
+      xmax = mean_mem + sd_mem#,
+      # color = flag
+    ),
+    color = "grey30"
+  ) +
+  labs(x = "Change in TCB",
+       y = "LME") +
+  scale_fill_viridis("Diection index",
+                     option = "D",
+                     direction = -1,
+                     alpha = 0.8) + 
+  facet_wrap(~esm)
+
+ggsave(plot = last_plot(),
+       "../figures/lme_bar_plot_dir_85.png",
+       width = 10,
+       height = 7)
+  
+```
+
+### Maps
+
+Plots maps for average, sd and direction change
+
+```{r}
+
+for(i in 1:length(unique(delta_df$name))){
+  
+  variable <- unique(delta_df$name)[i]
+  
+  if(variable == "n_direction"){
+    leg_title = "Direction index"
+  }
+  
+  if(variable == "sd_mem"){
+    leg_title = "Variation\n(%)"
+  }
+  
+  if(variable == "mean_mem"){
+    leg_title = "Mean change\n(%)"
+  }
+  
+  
+  figure_name <- paste0("../figures/lme_",variable,"_map_85.png")
+  
+  lme_sf %>% 
+    left_join(delta_df %>% filter(name == variable)) %>%
+    ggplot() +
+    geom_sf( 
+      aes(
+        fill = value),
+      color = "grey30"
+    ) +
+    geom_sf(data = world,aes(), fill = "antiquewhite")+
+    scale_color_viridis(leg_title, option = "D",direction = -1) +
+    scale_fill_viridis(leg_title, option = "D",direction = -1) +
+    facet_wrap(~esm) +
+    coord_sf(crs = crs, 
+             xlim = c(-2300000, 2300000), 
+             ylim = c(-2300000, 2300000)) +
+    MyFunctions::my_ggtheme_m(map_type = "reg",
+                              leg_pos = "right"
+    ) +
+    theme(axis.text.y = element_blank(),
+          legend.title.align = 0.5
+    )
+  
+  ggsave(plot = last_plot(),
+         figure_name,
+         width = 8,
+         height = 4)
+  
+}
+
+```
+
+# Old code 
+
+## Grid level analysis
+
+### MEOW grid
+
+```{r meow_grid, eval = F}
+
 
 meow <- MyFunctions::my_sf("MEOW")
 
@@ -75,119 +492,14 @@ fishmip_meow_df <- st_join(fishmip_sf,meow) %>%
 #   as.data.frame() %>% 
   # select(rowid,ecoregion,province,realm)
 
-```
-
-
-# Load Data
-
-```{r load_fishmip_data, eval = T, echo = F, message = F}
-
-# FishMip cmip6 data
-historical_list <- list.files(data_path,full.names = T, pattern = "historical")
-
-hist_df <- bind_rows(
-  lapply(historical_list, read_csv)
-)
-
-model_list <- list.files(data_path,full.names = T, pattern = "585")
-
-future_df <- bind_rows(
-  lapply(model_list, read_csv)
-  ) %>% 
-  mutate(ssp = as.character(ssp))
-
-
-all_models <- bind_rows(hist_df,future_df)
-
-unique(all_models$mem)
-unique(all_models$ssp)
 
 ```
 
-# Test plots
+### Proportion change
 
-## Ecoregion level
+```{r, eval = F}
 
-```{r}
-
-
-# Fix special; kids
-# 
-# 
-# delta_df_special_kids <- delta_df %>% 
-#   filter(mems== "dbpm;zoom",
-#          esm == "ipsl") %>% 
-#   left_join(extra_grid) %>% 
-#   left_join(extra_meow_df)
-
-# All Fishmip models
-
-models_df <- all_models %>% 
-  left_join(fishmip_grid,
-            by =c("lat", "lon")
-            ) %>% 
-  left_join(fishmip_meow_df,
-            by = "rowid") %>% 
-  mutate(ecoregion = ifelse(is.na(ecoregion) & lat > 60, "Central A.",ecoregion)) %>% 
-  group_by(ecoregion,esm,year,mem,ssp) %>% 
-  summarise(tcb = sum(tcb, na.rm = T)) 
-
-```
-
-## Ecoregion level
-
-```{r}
-
-historic_data <- models_df %>% 
-  filter(ssp == "historical",
-         year > 1995) %>% 
-  group_by(ecoregion,esm,mem) %>% 
-  summarise(mean_hist = mean(tcb, na.rm = T),
-            sd_hst = sd(tcb, na.rm = T)
-            )
-
-
-delta_df <- models_df  %>% 
-  filter(ssp != "historical",
-         year > 2030 & year < 2049) %>% 
-  group_by(ecoregion,esm,mem) %>% 
-  summarise(period_mean = mean(tcb,na.rm= T)) %>% 
-  left_join(historic_data,
-            by = join_by("ecoregion", "esm", "mem")
-  ) %>% 
-  # mutate(change = period_mean-mean_hist) %>%
-  mutate(change = ((period_mean-mean_hist)/mean_hist)*100,
-         direction = case_when(
-           change > 0 ~ "Increase",
-           change < 0 ~ "Decrease",
-           TRUE ~ "No Change"
-           )
-         ) %>% 
-  group_by(ecoregion,esm) %>% 
-  summarise(
-    mean_mem = mean(change,na.rm = T),
-    sd_mem = sd(change,na.rm = T),
-    n_mems = length(unique(mem)),
-    mems = paste(unique(mem),collapse = ";"),
-    n_direction = max(sum(direction == "Increase", na.rm = TRUE),sum(direction == "Decrease", na.rm = TRUE))/n_mems) %>% 
-  filter(n_mems>1) %>% 
-  pivot_longer(
-    cols = c(mean_mem,sd_mem,n_direction)
-    )
-
-
-max(delta_df$n_mems)
-
-unique(models_df$mem)
-unique(models_df$ecoregion)
-
-```
-
-## Grid level
-
-```{r}
-
-historic_data <- models_df %>% 
+historic_data <- all_models %>% 
   filter(ssp == "historical",
          year > 1995) %>% 
   group_by(lat,lon,esm,mem) %>% 
@@ -223,171 +535,13 @@ max(delta_df$n_mems)
 
 unique(models_df$mem)
 
-```
-
-## Generate datasets
-
-```{r}
-
-mean_data <- delta_df %>% 
-  filter(
-         # period == "mid", 
-         !is.na(value),
-         name == "mean_mem"#,
-         # lat > 60
-         ) %>% 
-  mutate(value_plot = ifelse(value >100,100,value))
-
-sd_data <- delta_df %>% 
-  filter(
-         # period == "mid", 
-         !is.na(value),
-         name == "sd_mem"#,
-         # lat > 60
-         ) %>% 
-  mutate(value_plot = ifelse(value >100,100,value))
-
-direction_data <- delta_df %>% 
-  filter(
-    # period == "mid", 
-    !is.na(value),
-    name == "n_direction"#,
-    # lat > 60
-  ) %>% 
-  mutate(
-    n_direction = round(value,1)
-  )
-
-
 
 ```
 
-# Figures
-
-## Bar plot
-
-```{r}
-
-delta_df %>%
-  spread(name,value) %>% 
-  filter(!is.na(ecoregion)) %>% 
-  mutate(flag = ifelse(sd_mem > abs(mean_mem),"Larger","Smaller")) %>% 
-  # View()
-  ggplot() +
-  geom_bar( 
-    aes(
-      y = reorder(ecoregion,mean_mem),
-      x = mean_mem,
-      fill = flag),
-    stat = "identity"
-  ) +
-    geom_errorbar(
-      aes(
-        y = ecoregion,
-        xmin = mean_mem - sd_mem, 
-         xmax = mean_mem + sd_mem#,
-        # color = flag
-        ),
-      color = "black"
-      ) +
-  labs(x = "Change in TCB",
-         y = "Ecoregion") +
-  scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
-  scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
-  facet_wrap(~esm)
-
-ggsave(plot = last_plot(),
-       "..figures/bar_plot_ecoregion.png",
-       width = 10)
-  
-
-```
-
-## Direction
-
-```{r}
-
-delta_df %>%
-  spread(name,value) %>% 
-  filter(!is.na(ecoregion)) %>% 
-  # mutate(n_direction = ifelse(n_direction > 0.5,n_direction,n_direction*-1)) %>% 
-  # View()
-  ggplot() +
-  geom_bar( 
-    aes(
-      y = reorder(ecoregion,mean_mem),
-      x = mean_mem,
-      fill = n_direction),
-    stat = "identity"
-  ) +
-  geom_errorbar(
-    aes(
-      y = ecoregion,
-      xmin = mean_mem - sd_mem, 
-      xmax = mean_mem + sd_mem#,
-      # color = flag
-    ),
-    color = "grey30"
-  ) +
-  labs(x = "Change in TCB",
-       y = "Ecoregion") +
-  scale_fill_viridis(option = "D",
-                     direction = -1,
-                     alpha = 0.8) + 
-  facet_wrap(~esm)
-
-ggsave(plot = last_plot(),
-       "../figures/bar_plot_ecoregion_direction.png",
-       width = 10)
-  
-```
-
-
-## Maps
-
-### Average map 
-
-#### Ecoregion
-
-```{r}
-
-ecoregion_mean_map <- mean_data %>% 
-  left_join(fishmip_meow_df,
-            by = "ecoregion") %>% 
-  left_join(fishmip_grid,
-            by =c("rowid")
-  ) %>% 
-  mutate(ecoregion = ifelse(is.na(ecoregion) & lat > 60, "Central A.",ecoregion)) %>%  
-  ggplot() +
-  geom_tile( 
-    aes(
-      x = lon,
-      y = lat,
-      fill = value_plot,
-      color = value_plot)
-  ) +
-  geom_polygon(data = map_data("world"),
-               aes(long, lat, group = group),
-               fill = "grey50",
-               color = "black") +
-  coord_map("orthographic",ylim = c(70,90)) +
-  # scale_colour_gradient2("Delta Change") +
-  # scale_fill_gradient2("Delta Change")+
-  scale_color_viridis("Mean change %", option = "D") +
-  scale_fill_viridis("Mean change %", option = "D") +
-  facet_wrap(~esm)
-
-ggsave(plot = ecoregion_mean_map,
-       "../figures/mean_map_ecoregion.png",
-       width = 10)
-
-  
-
-```
 
 ### Grid Cell
 
-```{r}
+```{r, eval = F}
 
 ggplot() +
   geom_tile(data = mean_data, 
@@ -410,10 +564,10 @@ ggplot() +
 
 ```
 
-## Using countour 
+### Using countour 
 https://www.rdocumentation.org/packages/metR/versions/0.14.0/topics/geom_contour_fill
 
-```{r}
+```{r, eval = F}
 
 ggplot() +
   geom_contour_filled(data = mean_data,
@@ -437,93 +591,8 @@ ggplot() +
 
 ```
 
-## SD map 
 
-### Ecoregion
-
-```{r}
-
-
-ecoregion_sd_map <- sd_data %>% 
-  left_join(fishmip_meow_df,
-            by = "ecoregion") %>% 
-  left_join(fishmip_grid,
-            by =c("rowid")
-  ) %>% 
-  mutate(ecoregion = ifelse(is.na(ecoregion) & lat > 60, "Central A.",ecoregion)) %>% 
-  ggplot() +
-  geom_tile(
-    aes(
-      x = lon,
-      y =lat,
-      fill = value_plot,
-      color = value_plot
-      # fill = log10(value_plot),
-      # color = log10(value_plot)
-    )
-  ) +
-  geom_polygon(data = map_data("world"),
-               aes(long, lat, group = group),
-               fill = "grey50",
-               color = "black") +
-  coord_map("orthographic",ylim = c(70,90)) +
-  scale_color_viridis_b() +
-  scale_fill_viridis_b() +
-  facet_wrap(~esm)
-
-ggsave(plot = ecoregion_sd_map,
-       "../figures/sd_map_ecoregion.png",
-       width = 10)
-  
-
-```
-
-## Direction change
-
-
-```{r}
-
-ecoregion_direction_map <- direction_data %>% 
-  left_join(fishmip_meow_df,
-            by = "ecoregion") %>% 
-  left_join(fishmip_grid,
-            by =c("rowid")
-  ) %>% 
-  mutate(ecoregion = ifelse(is.na(ecoregion) & lat > 60, "Central A.",ecoregion)) %>%  
-  ggplot() +
-  geom_tile( 
-    aes(
-      x = lon,
-      y = lat,
-      fill = as.character(value),
-      color = as.character(value)
-      )
-  ) +
-  geom_polygon(data = map_data("world"),
-               aes(long, lat, group = group),
-               fill = "grey50",
-               color = "black") +
-  coord_map("orthographic",ylim = c(70,90)) +
-  # scale_colour_gradient2("Delta Change") +
-  # scale_fill_gradient2("Delta Change")+
-  scale_color_viridis("Direction index", option = "D",discrete = T) +
-  scale_fill_viridis("Direction index", option = "D",discrete = T) +
-  facet_wrap(~esm)
-
-ggsave(plot = ecoregion_direction_map,
-       "../figures/direction_map_ecoregion.png",
-       width = 10)
-
-  
-
-```
-```
-
-
-
-### Grid Cell
-
-```{r}
+```{r, eval = F}
 
 
 ggplot() +
@@ -550,7 +619,7 @@ ggplot() +
 ```
 
 
-```{r}
+```{r, eval = F}
 
 ggplot() +
   geom_contour_filled(data = sd_data, 
