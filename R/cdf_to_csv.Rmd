@@ -13,7 +13,8 @@ date: "2023-09-20"
 load_libs(c(
   "tidyverse",
   "ncdf4",
-  "metR"
+  "metR",
+  "sf"
 ))
 
 data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs"
@@ -87,5 +88,31 @@ lapply(files, cdf_to_csv)
 #       fill = tcb
 #     )
 #   )
+```
+
+# Get Fishmip grid
+
+
+```{r}
+
+# For all models but dbpm and zoom
+grid <- ReadNetCDF(files[1]) %>% 
+  group_by(lat,lon) %>% 
+  tally() %>% 
+  rowid_to_column() %>%
+  select(-n)
+
+write_csv(grid, "fishmip_grid_1deg.csv")
+
+
+# For dbpm and zoom on IPSL (WTAF?)
+grid <- ReadNetCDF(files[51]) %>% 
+  group_by(lat,lon) %>% 
+  tally() %>% 
+  rowid_to_column() %>%
+  select(-n)
+
+write_csv(grid, "zoom_dbpm_ipsl_grid_1deg.csv")
+
 ```
 
