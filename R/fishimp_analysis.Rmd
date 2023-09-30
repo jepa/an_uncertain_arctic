@@ -116,6 +116,9 @@ models_df <- all_models %>%
   summarise(tcb = sum(tcb, na.rm = T)) %>% 
   filter(!is.na(lme))
 
+unique(models_df$mem)
+unique(models_df$ssp)
+
 ```
 
 ## Proportion change
