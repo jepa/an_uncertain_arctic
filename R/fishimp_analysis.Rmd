@@ -71,7 +71,8 @@ unique(lme_sf$lme)
 world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") %>% 
   st_transform(world, crs = crs)
 
-fishmip_grid <- read_csv(paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/fishmip_grid_1deg.csv"))
+fishmip_grid <- read_csv(paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/fishmip_grid_1deg.csv")) %>% 
+  mutate(lon = lon-.5)
 
 # For some reason DBPM and ZOOMs for IPSL are in another grid account 
 # extra_grid <- read_csv(paste0("~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/zoom_dbpm_ipsl_grid_1deg.csv"))
@@ -104,20 +105,25 @@ historical_list <- list.files(data_path,full.names = T, pattern = "historical")
 
 hist_df <- bind_rows(
   lapply(historical_list, read_csv)
-)
+) %>% 
+  # Fix mismatching grids
+  mutate(lon = ifelse(!mem %in% c("dbpm","zoom"), lon-.5,lon))
 
 model_list <- list.files(data_path,full.names = T, pattern = ssp)
 
 future_df <- bind_rows(
   lapply(model_list, read_csv)
   ) %>% 
-  mutate(ssp = as.character(ssp))
+  # Fix mismatching grids
+  mutate(lon = ifelse(!mem %in% c("dbpm","zoom"), lon-.5,lon),
+         ssp = as.character(ssp)
+  )
 
 
 all_models <- bind_rows(hist_df,future_df)
 
-# unique(all_models$mem)
-# unique(all_models$ssp)
+unique(all_models$mem)
+unique(all_models$ssp)
 
 # Joint all data needed
 
@@ -179,9 +185,9 @@ delta_df <- models_df  %>%
     )
 
 
-# max(delta_df$n_mems)
-# unique(models_df$mem)
-# unique(models_df$lme)
+max(delta_df$n_mems)
+unique(models_df$mem)
+unique(models_df$lme)
 
 ```
 
@@ -249,7 +255,7 @@ agg_delta %>%
     )
 
 ggsave(plot = last_plot(),
-       paste0(figure_path,"lme_agg_bar_flag_",ssp,".png"),
+       paste0(figure_path,"lme_agg_bar_flag",ssp,".png"),
        width = 14,
        height = 7)
   
