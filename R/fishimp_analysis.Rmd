@@ -6,6 +6,16 @@ date: "2023-09-19"
 ---
 
 
+Maps:
+- Add lat/lon axis labels (if possible)
+- Increase margin to include all LMEs fully
+- Modify color bar labels to a full number range
+- Label each LME with a number, corresponding with the Y-axis labels in bargraphs
+- Label land masses
+
+
+
+
 ```{r results = "hide", warnings = F, message = F, eval = T}
 
 # Load needed functions
@@ -45,7 +55,9 @@ Data from [Protection Of The Marine Environment: PAME](https://pame.is/projects/
 ```{r lme_grid, eval = T}
 
 # Get Polar Large Marine Ecoregions
-lme_sf <- my_sf("Arctic_LME")
+lme_sf <- my_sf("Arctic_LME") %>% 
+  #Fix names for plots
+  mutate(lme = paste0(str_remove(lme, "LME"),"(",id,")"))
 crs <- st_crs(lme_sf)
 
 unique(lme_sf$lme)
@@ -84,6 +96,8 @@ unique(fishmip_lme_df$lme)
 
 ```{r load_fishmip_data, eval = T, echo = F, message = F}
 
+ssp <- "585"
+
 # FishMip cmip6 data
 historical_list <- list.files(data_path,full.names = T, pattern = "historical")
 
@@ -91,7 +105,7 @@ hist_df <- bind_rows(
   lapply(historical_list, read_csv)
 )
 
-model_list <- list.files(data_path,full.names = T, pattern = "585")
+model_list <- list.files(data_path,full.names = T, pattern = ssp)
 
 future_df <- bind_rows(
   lapply(model_list, read_csv)
@@ -101,8 +115,8 @@ future_df <- bind_rows(
 
 all_models <- bind_rows(hist_df,future_df)
 
-unique(all_models$mem)
-unique(all_models$ssp)
+# unique(all_models$mem)
+# unique(all_models$ssp)
 
 # Joint all data needed
 
@@ -118,6 +132,7 @@ models_df <- all_models %>%
 
 unique(models_df$mem)
 unique(models_df$ssp)
+unique(models_df$lme)
 
 ```
 
@@ -184,6 +199,14 @@ agg_delta <- delta_df %>%
 
 ### Bar plot on mean and sd
 
+Bar plots:
+- Modify color bar labels to a full number range ()
+- change colour of color bar (to not be the same as on the map)
+- fix typos in colour bar title and LME names
+- Label each LME with a number, corresponding with the LME labels in map
+- delete "LME" after LME names
+- add (%) after TCB on X-axis
+
 ```{r}
 
 agg_delta %>%
@@ -208,13 +231,23 @@ agg_delta %>%
         ),
       color = "black"
       ) +
-  labs(x = "Change in TCB",
-         y = "lme") +
-  scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
-  scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"))
+  labs(x = "Change in TCB (%)",
+         y = "Large Marine Ecosystem (LME)") +
+  scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"),
+                    breaks = seq(0,1,0.2)
+                    ) +
+  scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"),
+                     breaks = seq(0,1,0.2)
+                     ) +
+  my_ggtheme_p(
+    ax_tl_s = 12,
+    ax_tx_s = 9,
+    leg_tl_s = 12,
+    leg_tx_s = 9
+    )
 
 ggsave(plot = last_plot(),
-       "../figures/lme_agg_bar_flag_85.png",
+       paste0("../figures/lme_agg_bar_flag_",ssp,".png"),
        width = 10)
   
 
@@ -244,15 +277,25 @@ agg_delta %>%
     ),
     color = "grey30"
   ) +
-  labs(x = "Change in TCB",
-       y = "LME") +
-  scale_fill_viridis("Diection index",
-                     option = "D",
+  labs(x = "Change in TCB (%)",
+       y = "Large Marine Ecosystem (LME)") +
+  scale_fill_viridis("Direction Index",
+                     option = "A",
                      direction = -1,
-                     alpha = 0.8)
+                     alpha = 0.8,
+                     # limits = c(0,1),
+                     # breaks = seq(0,1,0.2)
+                     ) +
+  my_ggtheme_p(
+    ax_tl_s = 12,
+    ax_tx_s = 9,
+    leg_pos = "right",
+    leg_tl_s = 12,
+    leg_tx_s = 9
+    )
 
 ggsave(plot = last_plot(),
-       "../figures/lme_agg_bar_plot_dir_85.png",
+       paste0("../figures/lme_agg_bar_plot_dir_",ssp,".png"),
        width = 10)
   
 ```
@@ -277,11 +320,11 @@ for(i in 1:length(unique(agg_delta$name))){
   }
   
   if(variable == "mean_mem"){
-    leg_title = "Mean change\n(%)"
+    leg_title = "Change in TCB\n(%)"
   }
   
   
-  figure_name <- paste0("../figures/lme_",variable,"_agg_map_85.png")
+  figure_name <- paste0("../figures/lme_",variable,"_agg_map_",ssp,".png")
   
   lme_sf %>% 
     left_join(agg_delta %>% filter(name == variable)) %>%
@@ -292,15 +335,19 @@ for(i in 1:length(unique(agg_delta$name))){
       color = "grey30"
     ) +
     geom_sf(data = world,aes(), fill = "antiquewhite")+
+    geom_sf_label(aes(label = id, fill = value), color = "black") +
     scale_color_viridis(leg_title, option = "D",direction = -1) +
     scale_fill_viridis(leg_title, option = "D",direction = -1) +
+    scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) +
+    scale_y_continuous("Latiitude", breaks = c(35,40,45,50)) +
     coord_sf(crs = crs, 
-             xlim = c(-2300000, 2300000), 
-             ylim = c(-2300000, 2300000)) +
+             xlim = c(-4000000, 2300000), 
+             ylim = c(-3100000, 4100000)) +
     MyFunctions::my_ggtheme_m(map_type = "reg",
                               leg_pos = "right"
     ) +
-    theme(axis.text.y = element_blank(),
+    theme(
+      # axis.text.y = element_blank(),
           legend.title.align = 0.5
     )
   
