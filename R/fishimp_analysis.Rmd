@@ -97,7 +97,7 @@ unique(fishmip_lme_df$lme)
 
 ```{r load_fishmip_data, eval = T, echo = F, message = F}
 
-ssp <- "585"
+ssp <- "126"
 
 # FishMip cmip6 data
 historical_list <- list.files(data_path,full.names = T, pattern = "historical")
