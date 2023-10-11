@@ -98,7 +98,7 @@ unique(fishmip_lme_df$lme)
 
 ```{r load_fishmip_data, eval = T, echo = F, message = F}
 
-ssp <- "126"
+ssp <- "585"
 
 # FishMip cmip6 data
 historical_list <- list.files(data_path,full.names = T, pattern = "historical")
@@ -137,11 +137,53 @@ models_df <- all_models %>%
   summarise(tcb = sum(tcb, na.rm = T)) %>% 
   filter(!is.na(lme))
 
-unique(models_df$mem)
+unique(models_df$mem) # loosing DBEM, why the rito? Maybe 0.5? Yaaaaas
 unique(models_df$ssp)
 unique(models_df$lme)
 
 ```
+
+### DBEM issues
+
+DBEM needs to be transformed from 0.5 to 1 deg. It is going to make the results go BA-NA-NAS you just wait for it... Yup... DBEM goes 0ver 100%...
+
+```{r}
+
+# Deal with DBEM
+dbem <- all_models %>% 
+  filter(mem == "dbem") %>% 
+  mutate_at(vars(lon,lat),round) %>% 
+  # Fix the fact that the Earth is not flat
+  mutate(
+    lat = ifelse(lat < 0, lat + 1/2, lat - 1/2),
+    lon = ifelse(lon < 0, lon + 1/2, lon - 1/2)
+  ) %>% 
+  # Match with FishMip grid
+  mutate(lon = lon-.5) %>% 
+  group_by(lon,lat,year,esm,mem,ssp) %>% 
+  summarise_all(sum,na.rm=T) %>% 
+  left_join(fishmip_grid,
+            by =c("lat", "lon")
+  ) %>% 
+  left_join(fishmip_lme_df,
+            by = "rowid") %>% 
+  group_by(lme,esm,year,mem,ssp) %>% 
+  summarise(tcb = sum(tcb, na.rm = T)) %>% 
+  filter(!is.na(lme))
+
+# Join DBEM with rest
+models_df <- models_df %>% 
+  filter(mem != "dbem") %>%
+  bind_rows(dbem)
+
+
+unique(models_df$mem) # loosing DBEM, why the rito? Maybe 0.5? Yaaaaas
+unique(models_df$ssp)
+unique(models_df$lme)
+
+```
+
+
 
 ## Proportion change
 
@@ -160,7 +202,7 @@ delta_df <- models_df  %>%
   filter(ssp != "historical",
          year > 2030 & year < 2049) %>% 
   group_by(lme,esm,mem) %>% 
-  summarise(period_mean = mean(tcb,na.rm= T)) %>% 
+  summarise(period_mean = mean(tcb,na.rm= T),.groups = "keep") %>% 
   left_join(historic_data,
             by = join_by("lme", "esm", "mem")
   ) %>% 
@@ -178,7 +220,8 @@ delta_df <- models_df  %>%
     sd_mem = sd(change,na.rm = T),
     n_mems = length(unique(mem)),
     mems = paste(unique(mem),collapse = ";"),
-    n_direction = max(sum(direction == "Increase", na.rm = TRUE),sum(direction == "Decrease", na.rm = TRUE))/n_mems) %>% 
+    n_direction = max(sum(direction == "Increase", na.rm = TRUE),sum(direction == "Decrease", na.rm = TRUE))/n_mems,
+    .groups = "keep") %>% 
   filter(n_mems>1) %>% 
   pivot_longer(
     cols = c(mean_mem,sd_mem,n_direction)
@@ -201,18 +244,13 @@ agg_delta <- delta_df %>%
   group_by(lme,name) %>% 
   summarise(
     value = mean(value,na.rm = T)
-  )
+  ) %>% 
+  # Scale value for plotting (Mostly do deal with DBEM)
+  mutate(value = ifelse(value >= 50,50,
+                      ifelse(value <0 -50,-50, value)))
 ```
 
 ### Bar plot on mean and sd
-
-Bar plots:
-- Modify color bar labels to a full number range ()
-- change colour of color bar (to not be the same as on the map)
-- fix typos in colour bar title and LME names
-- Label each LME with a number, corresponding with the LME labels in map
-- delete "LME" after LME names
-- add (%) after TCB on X-axis
 
 ```{r}
 
@@ -233,7 +271,7 @@ agg_delta %>%
       aes(
         y = lme,
         xmin = mean_mem - sd_mem, 
-         xmax = mean_mem + sd_mem#,
+         xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
         # color = flag
         ),
       color = "black"
@@ -246,6 +284,8 @@ agg_delta %>%
   scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"),
                      breaks = seq(0,1,0.2)
                      ) +
+  scale_x_continuous(limits = c(-20,50),
+                     breaks = seq(-20,50,10)) +
   my_ggtheme_p(
     ax_tl_s = 24,
     ax_tx_s = 19,
@@ -255,7 +295,7 @@ agg_delta %>%
     )
 
 ggsave(plot = last_plot(),
-       paste0(figure_path,"lme_agg_bar_flag",ssp,".png"),
+       paste0(figure_path,"lme_agg_bar_flag_",ssp,".png"),
        width = 14,
        height = 7)
   
@@ -282,7 +322,7 @@ agg_delta %>%
     aes(
       y = lme,
       xmin = mean_mem - sd_mem, 
-      xmax = mean_mem + sd_mem
+      xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
     ),
     color = "grey30"
   ) +
@@ -381,6 +421,9 @@ for(i in 1:length(unique(agg_delta$name))){
 ```{r}
 
 delta_df %>%
+  # Scale value for plotting (Mostly do deal with DBEM)
+  mutate(value = ifelse(value >= 50,50,
+                      ifelse(value <0 -50,-50, value))) %>% 
   spread(name,value) %>% 
   mutate(flag = ifelse(sd_mem > abs(mean_mem),"Larger","Smaller")) %>% 
   ggplot() +
@@ -394,8 +437,8 @@ delta_df %>%
     geom_errorbar(
       aes(
         y = lme,
-        xmin = mean_mem - sd_mem, 
-         xmax = mean_mem + sd_mem
+        xmin = ifelse(mean_mem - sd_mem <= -50,-50, mean_mem - sd_mem),
+         xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
         ),
       color = "black"
       ) +
@@ -426,6 +469,9 @@ ggsave(plot = last_plot(),
 ```{r}
 
 delta_df %>%
+  # Scale value for plotting (Mostly do deal with DBEM)
+  mutate(value = ifelse(value >= 50,50,
+                      ifelse(value <0 -50,-50, value))) %>% 
   spread(name,value) %>% 
   filter(!is.na(lme)) %>% 
   ggplot() +
@@ -440,7 +486,7 @@ delta_df %>%
     aes(
       y = lme,
       xmin = mean_mem - sd_mem, 
-      xmax = mean_mem + sd_mem#,
+      xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
       # color = flag
     ),
     color = "grey30"
@@ -495,6 +541,9 @@ for(i in 1:length(unique(delta_df$name))){
   
   lme_sf %>% 
     left_join(delta_df %>% filter(name == variable)) %>%
+    # Scale value for plotting (Mostly do deal with DBEM)
+  mutate(value = ifelse(value >= 50,50,
+                      ifelse(value <0 -50,-50, value))) %>% 
     ggplot() +
     geom_sf( 
       aes(
