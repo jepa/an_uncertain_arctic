@@ -41,7 +41,8 @@ load_libs(c(
 
 # Data path
 data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/csv/"
-
+figure_path <- "~/Library/CloudStorage/GoogleDrive-jepa88@gmail.com/My Drive/uncertain_arctic_figures/"
+  
 ```
 
 # Methods
@@ -96,7 +97,7 @@ unique(fishmip_lme_df$lme)
 
 ```{r load_fishmip_data, eval = T, echo = F, message = F}
 
-ssp <- "126"
+ssp <- "585"
 
 # FishMip cmip6 data
 historical_list <- list.files(data_path,full.names = T, pattern = "historical")
@@ -247,7 +248,7 @@ agg_delta %>%
     )
 
 ggsave(plot = last_plot(),
-       paste0("../figures/lme_agg_bar_flag_",ssp,".png"),
+       paste0(figure_path,"lme_agg_bar_flag_",ssp,".png"),
        width = 10)
   
 
@@ -287,17 +288,20 @@ agg_delta %>%
                      # breaks = seq(0,1,0.2)
                      ) +
   my_ggtheme_p(
-    ax_tl_s = 12,
-    ax_tx_s = 9,
+    ax_tl_s = 24,
+    ax_tx_s = 19,
     leg_pos = "right",
-    leg_tl_s = 12,
-    leg_tx_s = 9
+    leg_tl_s = 22,
+    leg_tx_s = 19
     )
 
 ggsave(plot = last_plot(),
-       paste0("../figures/lme_agg_bar_plot_dir_",ssp,".png"),
-       width = 10)
+       paste0(figure_path,"lme_agg_bar_plot_dir_",ssp,".png"),
+       width = 14)
   
+
+
+
 ```
 
 
@@ -324,7 +328,7 @@ for(i in 1:length(unique(agg_delta$name))){
   }
   
   
-  figure_name <- paste0("../figures/lme_",variable,"_agg_map_",ssp,".png")
+  figure_name <- paste0(figure_path,"lme_",variable,"_agg_map_",ssp,".png")
   
   lme_sf %>% 
     left_join(agg_delta %>% filter(name == variable)) %>%
@@ -386,15 +390,23 @@ delta_df %>%
         ),
       color = "black"
       ) +
-  labs(x = "Change in TCB",
-         y = "lme") +
+  labs(x = "Change in TCB (%)",
+         y = "Large Marine Ecosystem (LME)") +
   scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
   scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
-  facet_wrap(~esm)
+  facet_wrap(~esm) +
+  my_ggtheme_p(
+    ax_tl_s = 24,
+    ax_tx_s = 19,
+    leg_pos = "right",
+    leg_tl_s = 22,
+    leg_tx_s = 19
+    )
 
 ggsave(plot = last_plot(),
-       "../figures/lme_bar_plot_flag_85.png",
-       width = 10)
+       paste0(figure_path,"lme_bar_plot_flag",ssp,".png"),
+       width = 14,
+       height = 10)
   
 
 ```
@@ -423,18 +435,25 @@ delta_df %>%
     ),
     color = "grey30"
   ) +
-  labs(x = "Change in TCB",
-       y = "LME") +
+  labs(x = "Change in TCB (%)",
+       y = "Large Marine Ecosystem (LME)") +
   scale_fill_viridis("Diection index",
-                     option = "D",
+                     option = "A",
                      direction = -1,
                      alpha = 0.8) + 
-  facet_wrap(~esm)
+  facet_wrap(~esm) +
+  my_ggtheme_p(
+    ax_tl_s = 24,
+    ax_tx_s = 19,
+    leg_pos = "right",
+    leg_tl_s = 22,
+    leg_tx_s = 19
+    )
 
 ggsave(plot = last_plot(),
-       "../figures/lme_bar_plot_dir_85.png",
-       width = 10,
-       height = 7)
+       paste0(figure_path,"lme_bar_plot_dir_",ssp,".png"),
+       width = 14,
+       height = 10)
   
 ```
 
@@ -457,11 +476,11 @@ for(i in 1:length(unique(delta_df$name))){
   }
   
   if(variable == "mean_mem"){
-    leg_title = "Mean change\n(%)"
+    leg_title = "Change in TCB\n(%)"
   }
   
   
-  figure_name <- paste0("../figures/lme_",variable,"_map_85.png")
+  figure_name <- paste0(figure_path,"lme_",variable,"_map_",ssp,".png")
   
   lme_sf %>% 
     left_join(delta_df %>% filter(name == variable)) %>%
@@ -472,14 +491,18 @@ for(i in 1:length(unique(delta_df$name))){
       color = "grey30"
     ) +
     geom_sf(data = world,aes(), fill = "antiquewhite")+
+    geom_sf_label(aes(label = id, fill = value), color = "black") +
     scale_color_viridis(leg_title, option = "D",direction = -1) +
     scale_fill_viridis(leg_title, option = "D",direction = -1) +
     facet_wrap(~esm) +
+    scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) +
+    scale_y_continuous("Latiitude", breaks = c(35,40,45,50)) +
     coord_sf(crs = crs, 
-             xlim = c(-2300000, 2300000), 
-             ylim = c(-2300000, 2300000)) +
-    MyFunctions::my_ggtheme_m(map_type = "reg",
-                              leg_pos = "right"
+             xlim = c(-4000000, 2300000), 
+             ylim = c(-3100000, 4100000)) +
+    my_ggtheme_m(map_type = "reg",
+                              leg_pos = "right",
+                              facet_tl_s = 16
     ) +
     theme(axis.text.y = element_blank(),
           legend.title.align = 0.5
@@ -487,8 +510,8 @@ for(i in 1:length(unique(delta_df$name))){
   
   ggsave(plot = last_plot(),
          figure_name,
-         width = 8,
-         height = 4)
+         width = 10,
+         height = 5)
   
 }
 
