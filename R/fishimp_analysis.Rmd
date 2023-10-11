@@ -187,7 +187,7 @@ delta_df <- models_df  %>%
 
 # Results
 
-# All ESMs and all MEMs
+## All ESMs and all MEMs
 
 ```{r}
 
@@ -241,15 +241,17 @@ agg_delta %>%
                      breaks = seq(0,1,0.2)
                      ) +
   my_ggtheme_p(
-    ax_tl_s = 12,
-    ax_tx_s = 9,
-    leg_tl_s = 12,
-    leg_tx_s = 9
+    ax_tl_s = 24,
+    ax_tx_s = 19,
+    leg_pos = "right",
+    leg_tl_s = 22,
+    leg_tx_s = 19
     )
 
 ggsave(plot = last_plot(),
        paste0(figure_path,"lme_agg_bar_flag_",ssp,".png"),
-       width = 10)
+       width = 14,
+       height = 7)
   
 
 ```
@@ -297,7 +299,8 @@ agg_delta %>%
 
 ggsave(plot = last_plot(),
        paste0(figure_path,"lme_agg_bar_plot_dir_",ssp,".png"),
-       width = 14)
+       width = 14,
+       height = 7)
   
 
 
@@ -396,17 +399,18 @@ delta_df %>%
   scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete")) +
   facet_wrap(~esm) +
   my_ggtheme_p(
-    ax_tl_s = 24,
-    ax_tx_s = 19,
+    ax_tl_s = 22,
+    ax_tx_s = 17,
     leg_pos = "right",
-    leg_tl_s = 22,
-    leg_tx_s = 19
+    leg_tl_s = 20,
+    leg_tx_s = 17,
+    facet_tx_s = 20
     )
 
 ggsave(plot = last_plot(),
        paste0(figure_path,"lme_bar_plot_flag",ssp,".png"),
        width = 14,
-       height = 10)
+       height = 7)
   
 
 ```
@@ -443,17 +447,18 @@ delta_df %>%
                      alpha = 0.8) + 
   facet_wrap(~esm) +
   my_ggtheme_p(
-    ax_tl_s = 24,
-    ax_tx_s = 19,
+    ax_tl_s = 22,
+    ax_tx_s = 17,
     leg_pos = "right",
-    leg_tl_s = 22,
-    leg_tx_s = 19
+    leg_tl_s = 20,
+    leg_tx_s = 17,
+    facet_tx_s = 20
     )
 
 ggsave(plot = last_plot(),
        paste0(figure_path,"lme_bar_plot_dir_",ssp,".png"),
        width = 14,
-       height = 10)
+       height = 7)
   
 ```
 
