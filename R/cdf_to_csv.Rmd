@@ -4,11 +4,11 @@ output: html_document
 date: "2023-09-20"
 ---
 
-
 # Loading R libraries
 
 ```{r results = "hide", warnings = F, message = F, eval = F}
 
+source("../functions/load_libraries.R")
 
 load_libs(c(
   "tidyverse",
