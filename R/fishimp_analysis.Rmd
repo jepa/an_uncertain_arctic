@@ -6,15 +6,6 @@ date: "2023-09-19"
 ---
 
 
-Maps:
-- Add lat/lon axis labels (if possible)
-- Increase margin to include all LMEs fully
-- Modify color bar labels to a full number range
-- Label each LME with a number, corresponding with the Y-axis labels in bargraphs
-- Label land masses
-
-
-
 
 ```{r results = "hide", warnings = F, message = F, eval = T}
 
@@ -58,7 +49,8 @@ Data from [Protection Of The Marine Environment: PAME](https://pame.is/projects/
 # Get Polar Large Marine Ecoregions
 lme_sf <- my_sf("Arctic_LME") %>% 
   #Fix names for plots
-  mutate(lme = paste0(str_remove(lme, "LME"),"(",id,")"))
+  mutate(lme = paste0(str_remove(lme, "LME"),"(",id,")"),
+         lme = ifelse(lme == "Alutian Islands (10)","Aleutian Islands (10)",lme)) # fix misspell
 crs <- st_crs(lme_sf)
 
 unique(lme_sf$lme)
@@ -244,10 +236,11 @@ agg_delta <- delta_df %>%
   group_by(lme,name) %>% 
   summarise(
     value = mean(value,na.rm = T)
-  ) %>% 
-  # Scale value for plotting (Mostly do deal with DBEM)
-  mutate(value = ifelse(value >= 50,50,
-                      ifelse(value <0 -50,-50, value)))
+  ) #%>% 
+  # mutate(value = ifelse(value >= 50,50,
+  #                     ifelse(value < -50, -50, value)
+  #                     )
+  #        ) # Scale value for plotting (Mostly do deal with DBEM)
 ```
 
 ### Bar plot on mean and sd
@@ -263,29 +256,29 @@ agg_delta %>%
   geom_bar( 
     aes(
       y = reorder(lme,mean_mem),
-      x = mean_mem,
+      x = ifelse(mean_mem >50,50,mean_mem),
       fill = flag),
     stat = "identity"
   ) +
     geom_errorbar(
       aes(
         y = lme,
-        xmin = mean_mem - sd_mem, 
+        xmin = ifelse(mean_mem - sd_mem < -50,-50,mean_mem - sd_mem), #Fix for graph
          xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
         # color = flag
         ),
       color = "black"
       ) +
   labs(x = "Change in TCB (%)",
-         y = "Large Marine Ecosystem (LME)") +
+         y = "Large Marine Ecosystem") +
   scale_fill_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"),
                     breaks = seq(0,1,0.2)
                     ) +
   scale_color_manual(values = wesanderson::wes_palette("GrandBudapest2", type = "discrete"),
                      breaks = seq(0,1,0.2)
                      ) +
-  scale_x_continuous(limits = c(-20,50),
-                     breaks = seq(-20,50,10)) +
+  scale_x_continuous(limits = c(-50,50),
+                     breaks = seq(-50,50,10)) +
   my_ggtheme_p(
     ax_tl_s = 24,
     ax_tx_s = 19,
@@ -310,31 +303,37 @@ ggsave(plot = last_plot(),
 agg_delta %>%
   spread(name,value) %>% 
   filter(!is.na(lme)) %>% 
+  # View()
   ggplot() +
   geom_bar( 
     aes(
       y = reorder(lme,mean_mem),
-      x = mean_mem,
+      x = ifelse(mean_mem >50,50,mean_mem),
       fill = n_direction),
     stat = "identity"
   ) +
   geom_errorbar(
     aes(
       y = lme,
-      xmin = mean_mem - sd_mem, 
+      # xmin = mean_mem - sd_mem,
+      xmin = ifelse(mean_mem - sd_mem < -50,-50,mean_mem - sd_mem), #Fix for graph
       xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
     ),
     color = "grey30"
   ) +
   labs(x = "Change in TCB (%)",
-       y = "Large Marine Ecosystem (LME)") +
-  scale_fill_viridis("Direction Index",
+       y = "Large Marine Ecosystem") +
+  scale_fill_viridis("Model Agreement\n Index",
                      option = "A",
                      direction = -1,
                      alpha = 0.8,
-                     # limits = c(0,1),
-                     # breaks = seq(0,1,0.2)
+                     limits = c(0.6,1),
+                     breaks = seq(0.6,1,0.1)
                      ) +
+  scale_x_continuous(
+    limits = c(-50,50),
+    breaks = seq(-50,50,10)
+    ) +
   my_ggtheme_p(
     ax_tl_s = 24,
     ax_tx_s = 19,
@@ -384,11 +383,14 @@ for(i in 1:length(unique(agg_delta$name))){
     ggplot() +
     geom_sf( 
       aes(
-        fill = value),
+        fill = ifelse(value > 50,50,value)
+        ),
       color = "grey30"
     ) +
     geom_sf(data = world,aes(), fill = "antiquewhite")+
-    geom_sf_label(aes(label = id, fill = value), color = "black") +
+    geom_sf_label(aes(label = id, 
+                      fill = ifelse(value > 50,50,value)),
+                  color = "black") +
     scale_color_viridis(leg_title, option = "D",direction = -1) +
     scale_fill_viridis(leg_title, option = "D",direction = -1) +
     scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) +
