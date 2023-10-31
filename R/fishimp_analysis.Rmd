@@ -90,7 +90,7 @@ unique(fishmip_lme_df$lme)
 
 ```{r load_fishmip_data, eval = T, echo = F, message = F}
 
-ssp <- "585"
+ssp <- "126"
 
 # FishMip cmip6 data
 historical_list <- list.files(data_path,full.names = T, pattern = "historical")
@@ -241,6 +241,11 @@ agg_delta <- delta_df %>%
   #                     ifelse(value < -50, -50, value)
   #                     )
   #        ) # Scale value for plotting (Mostly do deal with DBEM)
+
+
+# Save dataset
+write_csv(agg_delta,paste0("../results/proportion_cahnge_ssp_",ssp,".csv"))
+
 ```
 
 ### Bar plot on mean and sd

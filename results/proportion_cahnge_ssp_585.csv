@@ -1,0 +1,55 @@
+lme,name,value
+Aleutian Islands (10),mean_mem,-6.272595187362229
+Aleutian Islands (10),n_direction,1
+Aleutian Islands (10),sd_mem,3.3126443220095485
+Baffin Bay (16),mean_mem,-4.1611285193333964
+Baffin Bay (16),n_direction,0.8611111111111112
+Baffin Bay (16),sd_mem,5.810230241971185
+Barents Sea (5),mean_mem,3.2638768784335586
+Barents Sea (5),n_direction,0.7222222222222222
+Barents Sea (5),sd_mem,8.418095358035618
+Beaufort Sea (14),mean_mem,21.504081270196544
+Beaufort Sea (14),n_direction,0.9166666666666667
+Beaufort Sea (14),sd_mem,29.01315822207592
+Central Arctic (13),mean_mem,613.8545457701746
+Central Arctic (13),n_direction,0.8055555555555556
+Central Arctic (13),sd_mem,1768.0996356835822
+Chukchi Sea (12),mean_mem,6.514127554116131
+Chukchi Sea (12),n_direction,0.7777777777777778
+Chukchi Sea (12),sd_mem,17.36258091946908
+East Bering Sea (9),mean_mem,-1.9915832045931334
+East Bering Sea (9),n_direction,0.7777777777777778
+East Bering Sea (9),sd_mem,2.8996310137145396
+East Siberian Sea (8),mean_mem,4.683539755873451
+East Siberian Sea (8),n_direction,0.8333333333333333
+East Siberian Sea (8),sd_mem,12.72296939044002
+Fareo Plateau (1),mean_mem,-1.6059381615539476
+Fareo Plateau (1),n_direction,0.6666666666666666
+Fareo Plateau (1),sd_mem,5.697052892488948
+Greenland Sea (3),mean_mem,-4.412014408768497
+Greenland Sea (3),n_direction,0.8611111111111112
+Greenland Sea (3),sd_mem,5.611848483483293
+Hudson Bay (17),mean_mem,9.830004724598979
+Hudson Bay (17),n_direction,0.7777777777777778
+Hudson Bay (17),sd_mem,17.792740258346434
+Iceland (2),mean_mem,-8.09022414892001
+Iceland (2),n_direction,0.9444444444444444
+Iceland (2),sd_mem,4.4437608740499845
+Kara Sea (6),mean_mem,9.027650974925297
+Kara Sea (6),n_direction,0.6944444444444444
+Kara Sea (6),sd_mem,17.010196918844567
+Labrador Sea (18),mean_mem,-7.3607910594681885
+Labrador Sea (18),n_direction,0.9166666666666667
+Labrador Sea (18),sd_mem,5.086276887260709
+Laptev Sea (7),mean_mem,8.770291867365268
+Laptev Sea (7),n_direction,0.6388888888888888
+Laptev Sea (7),sd_mem,22.322257494537258
+Northern Canadian Archipelago (15),mean_mem,12.892695563771706
+Northern Canadian Archipelago (15),n_direction,0.9444444444444444
+Northern Canadian Archipelago (15),sd_mem,9.686703742172522
+Norwegain Sea (4),mean_mem,-8.56799676797781
+Norwegain Sea (4),n_direction,0.8888888888888888
+Norwegain Sea (4),sd_mem,5.259505195572469
+West Bering Sea (11),mean_mem,-3.9929888298718215
+West Bering Sea (11),n_direction,0.8611111111111112
+West Bering Sea (11),sd_mem,4.962841494344871
