@@ -50,7 +50,10 @@ Data from [Protection Of The Marine Environment: PAME](https://pame.is/projects/
 lme_sf <- my_sf("Arctic_LME") %>% 
   #Fix names for plots
   mutate(lme = paste0(str_remove(lme, "LME"),"(",id,")"),
-         lme = ifelse(lme == "Alutian Islands (10)","Aleutian Islands (10)",lme)) # fix misspell
+         lme = ifelse(lme == "Alutian Islands (10)","Aleutian Islands (10)",
+                      ifelse(lme == "Norwegain Sea (4)","Norwegian Sea (4)",
+                             lme))
+         ) # fix misspell
 crs <- st_crs(lme_sf)
 
 unique(lme_sf$lme)
@@ -307,6 +310,7 @@ ggsave(plot = last_plot(),
 
 agg_delta %>%
   spread(name,value) %>% 
+  mutate(flag = ifelse(sd_mem > abs(mean_mem),"Larger","Smaller")) %>% 
   filter(!is.na(lme)) %>% 
   # View()
   ggplot() +
@@ -325,6 +329,16 @@ agg_delta %>%
       xmax = ifelse(mean_mem + sd_mem >50,50,mean_mem + sd_mem), #Fix for graph
     ),
     color = "grey30"
+  ) +
+  geom_point( data = . %>% filter(flag == "Smaller"),
+    aes(
+      y = reorder(lme,mean_mem),
+      x = mean_mem
+    ),
+    shape = 23,
+    color = "#EBCC2A",
+    fill = "#EBCC2A",
+    size = 3
   ) +
   labs(x = "Change in TCB (%)",
        y = "Large Marine Ecosystem") +
@@ -352,9 +366,6 @@ ggsave(plot = last_plot(),
        width = 14,
        height = 7)
   
-
-
-
 ```
 
 
@@ -373,7 +384,7 @@ for(i in 1:length(unique(agg_delta$name))){
   }
   
   if(variable == "sd_mem"){
-    leg_title = "Variation\n(%)"
+    leg_title = "S.D. (%)"
   }
   
   if(variable == "mean_mem"){
