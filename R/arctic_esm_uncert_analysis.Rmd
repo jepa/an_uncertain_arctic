@@ -1,0 +1,550 @@
+---
+title: "Arctic ESM Uncertainty"
+author: "Izzy Morgante"
+date: "07/11/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#rm(list = ls())
+```
+
+```{r}
+# Set directories 
+#setwd("~/Documents/PhD/arctic_paper/code")
+root_data <- '~/Documents/PhD/arctic_paper/Arctic_Uncertainty/data'
+root_res <- '~/Documents/PhD/arctic_paper/Arctic_Uncertainty/results'
+```
+
+```{r packages, include=FALSE}
+library("tidyverse")
+library("ncdf4")
+library('sf')
+#library('rlme')
+
+library('viridis')
+library("wesanderson")
+
+library('MyFunctions') # from devtools::install_github("jepa/MyFunctions")
+library('ggplot2')
+library('gridExtra')
+
+library('zoo') # for running mean 
+
+```
+
+```{r functions, include=FALSE}
+# Edit my_sf function to allow for local paths (change when running on DROBO)
+my_sf2 <- function (sf_name, crs = "NA", simple = "NA", system = NA) 
+{ 
+    root_path <- paste(root_data, "/Spatial/", sep = "")
+    Options = c("SAU", "FAO", "LME", "Arctic_LME", "MEOW", "RFMO", 
+        "RFMO_tuna")
+    if (!sf_name %in% Options) {
+        print("Data type value not accepted. Current acceptable options:")
+        print(Options)
+        stop()
+    }
+    if (sf_name == "FAO") {
+        read_path <- "https://www.fao.org/fishery/geoserver/fifao/ows?service=WFS&request=GetFeature&version=1.0.0&typeName=fifao:FAO_AREAS_CWP_NOCOASTLINE"
+    }
+    if (sf_name == "SAU") {
+        read_path <- paste0(root_path, "SAU/SAU_Shapefile/SAUEEZ_July2015.shp")
+    }
+    if (sf_name == "MEOW") {
+        read_path <- paste0(root_path, "MEOW/meow_ecos.shp")
+    }
+    if (sf_name == "Arctic_LME") {
+        read_path <- paste0(root_path, "LME_boundaries_2014/LME_2013_polygon.shp")
+    }
+    if (sf_name == "RFMO") {
+        read_path <- paste0(root_path, "SAU/SAU_RFMO/SAU_RFMO_Sept_2015.shp")
+    }
+    if (sf_name == "RFMO_tuna") {
+        read_path <- paste0(root_path, "SAU/SAU_RFMO_TUNA/tuna_rfmo.shp")
+    }
+    if (crs != "NA") {
+        if (crs == "eck") {
+            crs <- "+proj=eck4"
+        }
+        else {
+            crs <- crs
+        }
+        return_sf <- sf::st_read(read_path) %>% sf::st_transform(crs = crs)
+    }
+    else {
+        return_sf <- sf::st_read(read_path)
+    }
+    if (simple != "NA") {
+        return_sf <- return_sf %>% sf::st_simplify(preserveTopology = TRUE, 
+            dTolerance = simple)
+    }
+    return_sf <- return_sf %>% janitor::clean_names()
+    return(return_sf)
+}
+
+
+my_ggtheme_m <- function(map_type = "global",
+                         ax_tx_s = 14,
+                         axx_tx_ang = 0,
+                         axy_tx_ang = 0,
+                         ax_tl_s = 15,
+                         leg_pos = "bottom",
+                         leg_aline = 0,
+                         leg_tl_s = 16,
+                         leg_tx_s = 14,
+                         leg_width = 1,
+                         hjust = 0, 
+                         facet_tx_s = 10){
+  
+  if(map_type == "global"){
+    
+    theme(
+      plot.title = element_text(size = rel(1), hjust = 0, face = "bold"),
+      # Background
+      panel.background = element_blank(),
+      strip.background = element_blank(),
+      panel.border   = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(colour = "white"),
+      # Axis
+      axis.ticks = element_line(color = "black"),
+      # axis.text = element_blank(),
+      axis.title = element_blank(),
+      # Legend 
+      legend.key = element_rect(colour = NA, fill = NA),
+      legend.position = leg_pos,
+      legend.title.align = leg_aline,
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 8),
+      legend.key.width = unit(leg_width,"line"),
+      # For facets
+      strip.text.x = element_text(size = 12, colour = "black"),
+      strip.text = element_text(size = 11)
+    )
+    
+  }else{
+    
+    theme(
+      plot.title = element_text(size = rel(1), hjust = 0, face = "bold"),
+      # Background
+      panel.background = element_blank(),
+      strip.background = element_blank(),
+      panel.border   = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(colour = "white"),
+      # Axis
+      axis.line = element_line(color = "black"),
+      axis.ticks = element_blank(),
+      axis.text.x = element_text(size = ax_tx_s,
+                                 angle = axx_tx_ang,
+                                 hjust = hjust,
+                                 face = "plain",
+                                 color = "black"),
+      axis.text.y = element_text(size = ax_tx_s,
+                                 color = "black"),
+      axis.title = element_text(size = ax_tl_s),
+      # Legend 
+      legend.key = element_rect(colour = NA, fill = NA),
+      legend.position = leg_pos,
+      legend.title.align = leg_aline,
+      legend.title = element_text(size = 12),
+      legend.text = element_text(size = 11),
+      # legend.key.width = unit(2,"line"),
+      # For facets
+      strip.text.x = element_text(size = 12, colour = "black"),
+      strip.text = element_text(size = 11)
+    )
+    
+  }
+}
+```
+
+```{r lme_grid, eval = T}
+# LME Data ---------------------
+# Get Polar Large Marine Ecoregions
+lme_sf <- my_sf2("Arctic_LME") %>% # Load Arctic LME Shapefiles
+  #Fix names for plots
+  mutate(lme = paste0(str_remove(lme, "LME"),"(",id,")"),
+         lme = ifelse(lme == "Alutian Islands (10)","Aleutian Islands (10)",lme),
+         lme = str_replace(lme, 'Fareo Plateau \\(1\\)', 'Faroe Plateau \\(1\\)'),
+         lme = str_replace(lme, 'Norwegain Sea \\(4\\)', 'Norwegian Sea \\(4\\)')) # fix misspell
+
+crs <- st_crs(lme_sf) # read coord reference system
+
+unique(lme_sf$lme) # List lmes
+
+# Get world map data and crop it to the polar region
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") %>% 
+  st_transform(world, crs = crs)
+
+
+# Plot Arctic LME boundaries 
+# p <- ggplot() +
+#   geom_sf(data = lme_sf, aes(fill = lme)) +
+#   geom_sf(data = world, aes(), fill = "antiquewhite") +
+#   scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) + # Filter for region of interest
+#     scale_y_continuous("Latiitude", breaks = c(35,40,45,50)) +
+#     coord_sf(crs = crs,
+#              xlim = c(-4000000, 2300000),
+#              ylim = c(-3100000, 4100000)) +
+# theme(legend.position = "")
+
+# DBEM data ---------------------------
+# Load dbem lat_lon grid 
+dbem_grid <- read.csv(paste0(root_data, '/Spatial/Lat_Lon.txt'), header = F) %>% 
+  rename(rowid = V1, lon = V2, lat = V3)
+
+# Turn DBEM grid into sf object
+dbem_sf <- st_as_sf(dbem_grid,
+                      coords = c("lon","lat"),
+                      crs = 4326
+                      )
+
+# Join DBEM grid with Arctic LMEs
+dbem_lme_df <- st_join(dbem_sf,lme_sf %>% st_transform(crs = 4326)) %>% 
+  as.data.frame() %>% 
+  select(rowid,lme) %>% 
+  filter(!is.na(lme)) # Keep row ids within lme
+
+unique(dbem_lme_df$lme)
+
+```
+
+## Environmental Data Manipulation
+
+```{r get_uncertainties}
+# Aggregate the data to find mean value for each lme 
+
+# Set up env variable to read
+save <- TRUE # if you want to save data_agg dataframe
+esms <- c('GFDL', 'IPSL')
+ssps <- c('26', '85')
+
+years <- 1995:2100
+vars <- c('SST', 'IceExt', 'totalphy2')
+
+agg_data <- NULL
+
+for (esm in esms){
+  for (ssp in ssps){
+    for (dbem_var in vars){
+      for (yr in years){
+        esm_path <- paste0('C6', esm, ssp)
+        
+        if (dbem_var == 'totalphy2'){
+          file_path <- paste0(dbem_var, yr, '.txt')
+        }else{
+          file_path <- paste0(dbem_var, '_', yr, '.txt')
+        }
+        
+        print(paste0(esm_path, '/', file_path))
+        
+        # Read ESM variable data
+           esm_d <- read.csv(file.path(root_data, esm_path, file_path), header = FALSE) %>% 
+          rename(value = V1) %>%
+          rowid_to_column("rowid") %>%
+          filter(value != -9999) %>% # remove land grid cells
+          filter(rowid %in% dbem_lme_df$rowid) # Filter for values that are in lme 
+        
+        # Join ESM data with Artic LME areas 
+        esm_lme <- left_join(esm_d, dbem_lme_df) 
+        
+        # Summarize the data - find mean value for each lme 
+        env_summary <- esm_lme %>% 
+          group_by(lme) %>%
+          summarise(mean = mean(value), 
+                    stdev = sd(value), 
+                    n = n()) 
+        
+        # Add descriptors 
+        env_summary$year <- yr
+        env_summary$esm <- esm
+        env_summary$ssp <- ssp
+        env_summary$variable <- dbem_var
+
+        agg_data <- rbind(agg_data, env_summary)
+        
+      }
+    }
+  }
+}
+
+if (save == TRUE){
+  save(agg_data, file = '../data/agg_data.Rda')
+}
+```
+
+```{r calc_rolling_mean}
+# Rename variables
+agg_data <- agg_data %>% 
+  mutate(lme = str_replace(lme, 'Fareo Plateau \\(1\\)', 'Faroe Plateau \\(1\\)'),
+         lme = str_replace(lme, 'Norwegain Sea \\(4\\)', 'Norwegian Sea \\(4\\)'))
+
+# Mutate isn't working with groupings -- have to do in for loop :( 
+roll_all <- NULL
+
+for (l in unique(agg_data$lme)){
+  for (s in unique(agg_data$ssp)){
+    for (e in unique(agg_data$esm)){
+      for (var in unique(agg_data$variable)){
+        roll <- agg_data %>% 
+          filter(ssp == s & lme == l & esm == e & variable == var) %>%
+          mutate(roll_mean = rollmean(mean, 10, fill=NA, align='right'))
+        
+        roll_all <- rbind(roll_all, roll)
+      }
+    }
+  }
+}
+
+if (save == TRUE){
+  save(agg_data, file = '../data/agg_data.Rda')
+  save(roll_all, file = '../data/rolling_means.Rda')
+}
+
+```
+
+## Plots
+
+```{r load_data_plotting}
+load(file = '../data/agg_data.Rda')
+load(file = '../data/rolling_means.Rda')
+```
+
+
+```{r roll_line_plots}
+# Plots are same as Fig A2.4.from Palacios-Abrantes et al. 2020
+# Line plot faceted by LME, lines for each SSP and ESM
+
+roll_lineplot <- function(var_plt, title = '', units = '', save_plt = FALSE){
+  
+  roll_lineplt <- ggplot(data = roll_all %>% 
+                           filter(variable == var_plt & year >= 2010) %>%
+                           mutate(lme = str_replace(lme, "Northern Canadian Archipelago \\(15\\)", "N. Canadian Archipelago \\(15\\)")), 
+                         aes(x = year, y = roll_mean)) +
+    facet_wrap(vars(factor(lme, levels=c('Faroe Plateau (1)',
+                                               'Iceland (2)',
+                                               'Greenland Sea (3)',
+                                               'Norwegian Sea (4)',
+                                               'Barents Sea (5)',
+                                               'Kara Sea (6)',
+                                               'Laptev Sea (7)',
+                                               'East Siberian Sea (8)',
+                                               'East Bering Sea (9)',
+                                               'Aleutian Islands (10)',
+                                               'West Bering Sea (11)',
+                                               'Chukchi Sea (12)',
+                                               'Central Arctic (13)',
+                                               'Beaufort Sea (14)',
+                                               'N. Canadian Archipelago (15)',
+                                               'Baffin Bay (16)',
+                                               'Hudson Bay (17)',
+                                               'Labrador Sea (18)'))), scales = 'free', ncol = 3) +
+    geom_rect(aes(xmin=2030, xmax=2049, ymin= -Inf , ymax=Inf), fill="#e0e0e0") +
+    geom_line(aes(linetype = ssp,  color= esm)) +
+    scale_color_manual(values=c('Blue', 'Red'),
+                       name="ESM",
+                       breaks=c("GFDL", "IPSL"),
+                      labels=c("GFDL-ESM4", "IPSL-CM6A-LR")
+                       ) +
+    scale_linetype_manual(values=c('solid', 'dashed'),
+                          name="Emission Scenario",
+                          breaks=c("26", "85"),
+                          labels=c("SSP1-2.56", "SSP5-8.5"))+
+    xlab('Year') + 
+    theme_bw() +
+    theme(legend.position = "top",
+          axis.line = element_line(color='black'),
+          plot.background = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank())
+  
+  if (title != ""){
+    roll_lineplt <- roll_lineplt + ggtitle(paste(title))
+  }
+  if (var_plt == 'totalphy2'){
+    roll_lineplt <- roll_lineplt + ylab(bquote("10 Year Running Mean")) # (mgC" ~ km^2 ~year^-1 ~")
+  }else{
+     roll_lineplt <- roll_lineplt + ylab(paste0('10 Year Running Mean (', units, ')')) 
+  }
+  
+  if (save_plt){
+    ggsave(filename=paste0(root_res, '/final/', var_plt, "_lineplots_rolling.jpeg"),
+           plot = roll_lineplt,
+           width = 210,
+           height = 297,
+           units = "mm",
+            bg = "white")
+
+  }
+  
+  return(roll_lineplt)
+}
+
+npp_roll <- roll_lineplot(var_plt = 'totalphy2',
+                          save_plt = TRUE)
+
+sst_roll <- roll_lineplot(var_plt = 'SST',
+                            title = '',
+                            units = '°C',
+                            save_plt = TRUE)
+
+ice_roll <- roll_lineplot(var_plt = 'IceExt',
+                            title = '',
+                            units = '% cover',
+                            save_plt = TRUE)
+```
+
+
+```{r study_avs}
+# Calculate average values over study period
+
+plt_vars <- c('SST', 'IceExt', 'totalphy2')
+
+study_means <- agg_data %>% 
+  filter(year >= 2030 & year <= 2049 & variable %in% plt_vars) %>%
+  group_by(ssp, lme, esm, variable) %>%
+  summarise(mean = mean(mean),
+            n = n())
+
+study_total <- study_means %>%
+  pivot_wider(values_from = mean, names_from = esm) %>%
+  mutate(range = GFDL - IPSL,
+         mean_total = (GFDL + IPSL) / 2)
+
+
+# Calculate means from reference period
+ref_means <- agg_data %>% 
+  filter(year >= 1995 & year <= 2014 & variable %in% plt_vars) %>%
+  group_by(ssp, lme, esm, variable) %>%
+  summarise(ref_mean = mean(mean),
+            ref_n = n())
+
+# Calculate percent change from reference period 
+study_ref_means <- left_join(study_means, ref_means) %>%
+  mutate(perc_change = ((mean - ref_mean) / ref_mean ) * 100)
+
+# Calculate absolute difference in change between GFDL and IPSL (abs_range)
+study_perc <- study_ref_means %>% select(ssp, lme, esm, variable, perc_change) %>%
+  pivot_wider(values_from = perc_change, names_from = esm) %>%
+  mutate(range = GFDL - IPSL,
+         abs_range = abs(range),
+         mean_perc_change = (GFDL + IPSL) / 2)
+
+# Set to NA for Ice in Faroe and Aleutian Islands
+study_perc <- study_perc %>% 
+  mutate(abs_range = ifelse(variable == 'IceExt' & lme %in% c('Faroe Plateau (1)', 'Aleutian Islands (10)'), NA, abs_range))
+
+```
+
+
+```{r map_perc_diff_facet}
+# Map for difference in % change between GFDL and IPSL
+
+vars <- c('IceExt', 'SST', 'totalphy2')
+max_per <- 100
+ssp_plt <- 26
+unit <- '%'
+
+env_names <- c(`SST` = 'A',
+               `totalphy2` = 'B',
+               `IceExt` = 'C')
+
+plt <-  lme_sf %>% 
+  left_join(study_perc %>% filter(ssp == ssp_plt & variable %in% vars)) %>%
+  ggplot() +
+  geom_sf( 
+    aes(fill = ifelse(abs_range > max_per, max_per, abs_range)), 
+    color = "grey30"
+  ) +
+  geom_sf(data = world,aes(), fill = "antiquewhite")+
+  geom_sf_label(aes(label = id, 
+                    fill = ifelse(abs_range > max_per, max_per, abs_range)), 
+                color = "black") +
+  scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) +
+  scale_y_continuous("Latiitude", breaks = c(35,40,45,50)) +
+  coord_sf(crs = crs, 
+           xlim = c(-4000000, 2300000), 
+           ylim = c(-3100000, 4100000)) + 
+  scale_color_viridis(paste0(unit), option = "D",direction = -1) +
+  scale_fill_viridis(paste0(unit), option = "D",direction = -1, limits=c(0, max_per)) +
+facet_wrap(vars(factor(variable, levels=c('SST', 'totalphy2', 'IceExt'))), labeller = as_labeller(env_names), ncol = 3) + # facet not good on account of scale
+  my_ggtheme_m(map_type = "global",
+               leg_pos = "bottom") +  
+  theme(legend.key.height = unit(0.5, 'cm'), #change legend key height
+        legend.key.width = unit(1, 'cm'), #change legend key width
+        legend.title = element_text(size=10), #change legend title font size
+        legend.text = element_text(size=10),
+        strip.text.x = element_text(size = 12, face = "bold", hjust = 0)) 
+  
+ggsave(filename=paste0(root_res, '/final/', "map_percent_difference_rcp", ssp_plt, ".jpeg"),
+       plot = plt,
+       width = 200,
+       units = "mm")
+```
+
+
+```{r map_diff}
+# Map plots for absolute difference between GFDL and IPSL values 
+
+map_plt_diff <- function(ssp_plt, var_plt, title = '', legd_title = '', max_per = 500){
+  plt <-  lme_sf %>% 
+    left_join(study_total %>%
+                mutate(range = ifelse(variable == 'IceExt' & lme %in% c('Faroe Plateau (1)', 'Aleutian Islands (10)'), NA, range)) %>% 
+                filter(ssp == ssp_plt & variable == var_plt)) %>%
+    ggplot() +
+    geom_sf( 
+      aes(fill = ifelse(abs(range) > max_per, max_per, abs(range))), # fill = ifelse(value > 50,50,value)
+      color = "grey30"
+    ) +
+    geom_sf(data = world,aes(), fill = "antiquewhite")+
+    geom_sf_label(aes(label = id, 
+                      fill = ifelse(abs(range) > max_per, max_per, abs(range))), #  fill = ifelse(value > 50,50,value)
+                  color = "black") +
+    scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) +
+    scale_y_continuous("Latiitude", breaks = c(35,40,45,50)) +
+    coord_sf(crs = crs, 
+             xlim = c(-4000000, 2300000), 
+             ylim = c(-3100000, 4100000)) + 
+    scale_color_viridis(paste0(legd_title), option = "D",direction = -1) +
+    scale_fill_viridis(paste0(legd_title), option = "D",direction = -1) +
+    my_ggtheme_m(map_type = "global",
+                 leg_pos = "bottom") +
+   # #  # facet_wrap(vars(variable), ncol = 3) # facet not good on account of scale 
+   ggtitle(paste0(title))  
+  
+  return(plt)
+}
+
+ssp <- '26'
+max <- 10000 
+sst_diff <- map_plt_diff(ssp_plt = ssp,
+                     var_plt = 'SST',
+                     legd_title = 'Difference \n(°C)',
+                     title = 'A',
+                     max_per = max)
+
+npp_diff <- map_plt_diff(ssp_plt = ssp,
+                     var_plt = 'totalphy2',
+                     legd_title = 'Difference \n(??)',
+                     title = 'B',
+                     max_per = max)
+
+ice_diff <- map_plt_diff(ssp_plt = ssp,
+                     var_plt = 'IceExt',
+                     legd_title = 'Difference \n(% cover)',
+                     title = 'C',
+                     max_per = max)
+
+
+map_diff <- arrangeGrob(sst_diff, npp_diff, ice_diff, ncol = 3)
+grid::grid.draw(map_diff)
+
+
+ggsave(filename=paste0(root_res, '/final/', "map_mean_difference_rcp", ssp, ".jpeg"),
+       plot = map_diff,
+       width = 210,
+       units = "mm")
+```
