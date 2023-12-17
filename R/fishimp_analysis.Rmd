@@ -23,13 +23,6 @@ load_libs(c(
 )
 )
 
-# library(reticulate)
-# library(tidyverse)
-# library(metR)
-# library(lubridate)
-# library(raster)
-# library(sf)
-
 # Data path
 data_path <- "~/Library/CloudStorage/OneDrive-UBC/Data/FishMip/cmip6_runs/csv/"
 figure_path <- "~/Library/CloudStorage/GoogleDrive-jepa88@gmail.com/My Drive/uncertain_arctic_figures/"
