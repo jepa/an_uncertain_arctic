@@ -45,7 +45,9 @@ lme_sf <- my_sf("Arctic_LME") %>%
   mutate(lme = paste0(str_remove(lme, "LME"),"(",id,")"),
          lme = ifelse(lme == "Alutian Islands (10)","Aleutian Islands (10)",
                       ifelse(lme == "Norwegain Sea (4)","Norwegian Sea (4)",
+                             ifelse(lme == "Fareo Plateau (1)","Faroe Plateau (1)",
                              lme))
+         )
          ) # fix misspell
 crs <- st_crs(lme_sf)
 
@@ -86,7 +88,7 @@ unique(fishmip_lme_df$lme)
 
 ```{r load_fishmip_data, eval = T, echo = F, message = F}
 
-ssp <- "126"
+ssp <- "585"
 
 # FishMip cmip6 data
 historical_list <- list.files(data_path,full.names = T, pattern = "historical")
@@ -228,7 +230,10 @@ unique(models_df$lme)
 
 ```{r}
 
-agg_delta <- delta_df %>% 
+# agg_delta <- read.csv("../results/proportion_cahnge_ssp_585.csv")
+
+agg_delta <- delta_df%>%
+ # agg_delta %>% 
   group_by(lme,name) %>% 
   summarise(
     value = mean(value,na.rm = T)
@@ -240,7 +245,7 @@ agg_delta <- delta_df %>%
 
 
 # Save dataset
-write_csv(agg_delta,paste0("../results/proportion_cahnge_ssp_",ssp,".csv"))
+write_csv(agg_delta,paste0("../results/proportion_cahnge_ssp.csv"))
 
 ```
 
@@ -385,14 +390,16 @@ for(i in 1:length(unique(agg_delta$name))){
   }
   
   
-  figure_name <- paste0(figure_path,"lme_",variable,"_agg_map_",ssp,".png")
+  figure_name <- paste0(figure_path,"lme_",variable,"_agg_map_",ssp,"B.png")
   
   lme_sf %>% 
     left_join(agg_delta %>% filter(name == variable)) %>%
+    mutate(value = ifelse(value > 50,50,round(value))) %>% 
+    # View()
     ggplot() +
     geom_sf( 
       aes(
-        fill = ifelse(value > 50,50,value)
+        fill = value,
         ),
       color = "grey30"
     ) +
@@ -400,19 +407,27 @@ for(i in 1:length(unique(agg_delta$name))){
     geom_sf_label(aes(label = id, 
                       fill = ifelse(value > 50,50,value)),
                   color = "black") +
-    scale_color_viridis(leg_title, option = "D",direction = -1) +
-    scale_fill_viridis(leg_title, option = "D",direction = -1) +
+    scale_color_viridis(leg_title, option = "D",direction = -1,
+                        # limits = c(0,50),
+                        # breaks = seq(0,50,10),
+                        # labels = seq(0, 50, by = 10)
+                        ) +
+    scale_fill_viridis(leg_title, option = "D",direction = -1,
+                       # limits = c(0,50),
+                       # breaks = seq(0,50,10),
+                        # labels = seq(0, 50, by = 10)
+                       ) +
     scale_x_continuous("Longitude", breaks = c(-50,-30,0,30)) +
     scale_y_continuous("Latiitude", breaks = c(35,40,45,50)) +
-    coord_sf(crs = crs, 
+    coord_sf(crs = crs,
              xlim = c(-4000000, 2300000), 
              ylim = c(-3100000, 4100000)) +
     MyFunctions::my_ggtheme_m(map_type = "reg",
-                              leg_pos = "right"
+    leg_pos = "right"
     ) +
     theme(
-      # axis.text.y = element_blank(),
-          legend.title.align = 0.5
+    # axis.text.y = element_blank(),
+    legend.title.align = 0.5
     )
   
   ggsave(plot = last_plot(),
