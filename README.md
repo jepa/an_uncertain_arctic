@@ -1,20 +1,32 @@
+# Key uncertainties and modeling needs for managing living marine resources in the future Arctic 
 
-README.md for scripts to accompany the **"Next-generation ensemble projections reveal higher climate risks for marine ecosystems"** paper by Tittensor et al. 
+## Authors 
 
-This folder contains four master scripts that load libraries and data, and perform analyses on Earth System Models inputs and Marine Ecosystem Models outputs. To reproduce the paper's analyses and figures, these scripts should be run in the following order:        
+Julia G. Mason,1 Andrea Bryndum-Buchholz2, Juliano Palacios-Abrantes3, Renuka Badhe4, Isabella Morgante3, Daniele Bianchi5, Julia L. Blanchard6,7, Jason D. Everett8,9,10, Cheryl S. Harrison11, Ryan F. Heneghan12, Camilla Novaglio6,7, Colleen M. Petrik13
 
-**Step 1**: run Batch_run_timeseries_inputs.Rmd which a) loads ESMs outputs (temperature, Primary Production, phytoplankton, zooplakton) from CMIP5 and CMIP6 runs, and saves temporary RData files; b) loads temporary files, averages the data and produces Fig 1.  
 
-**Step 2**: run Batch_run_maps_inputs.Rmd which a) loads ESMs outputs (temperature, Primary Production,  phytoplankton, zooplakton) from CMIP5 and CMIP6 runs, averages the data, and saves RData temporary files; b) loads temporary files, calculates changes between the 1990s and the 2090s and produces Fig 2, Fig S1 and Fig S2.
+## Author affiliations
 
-**Step 3**: run Batch_run_timeseries.Rmd which a) loads MEMs outputs (ocean biomass) from CMIP5 and CMIP6 and saves temporary RData files; b) loads temporary files, averages the data and produces Fig 3, Fig 4, Fig S7, Fig S8, Fig S11 and Fig S17.  
+- Environmental Defense Fund, 18 Tremont St. Ste 850, Boston MA 02108
+- Centre for Fisheries Ecosystems Research, Fisheries and Marine Institute, Memorial University of Newfoundland, St. John’s, NL, Canada
+- Institute for the Oceans and Fisheries,The University of British Columbia, Vancouver, BC, Canada
+- European Polar Board, Laan van Nieuw-Oost-Indië 300, 2593 CE The Hague, Netherlands
+- Department of Atmospheric and Oceanic Sciences, University of California Los Angeles, Los Angeles, CA, USA.
+- Institute for Marine and Antarctic Studies, University of Tasmania, Hobart, TAS, Australia
+- Centre for Marine Socioecology, University of Tasmania, Hobart, TAS, Australia
+- School of Mathematics and Physics, The University of Queensland, St. Lucia, Queensland, Australia.
+- Commonwealth Scientific and Industrial Research Organisation (CSIRO) Oceans and Atmosphere, Queensland Biosciences Precinct, St Lucia, Brisbane, Queensland, Australia. 
+- Centre for Marine Science and Innovation, The University of New South Wales, Sydney, New South Wales, Australia.
+- Department of Ocean and Coastal Science and Center for Computation and Technology, Louisiana State University, Baton Rouge, LA, USA
+- School of Science, Technology and Engineering, University of the Sunshine Coast, Petrie, Australia
+- Scripps Institution of Oceanography, University of California San Diego, CA, USA
 
-**Step 4**: run Batch_run_maps.Rmd which a) loads MEMs outputs (ocean biomass) from CMIP5 and CMIP6, averages the data, and saves temporary RData files; b) loads temporary files, calculates changes between the 1990s and the 2090s and produces Fig 5, Fig S9, Fig S12, Fig S18, Fig S5, Fig S13, Fig S19, Fig S6, Fig S10, Fig S16, Fig S20, Fig S4, Fig S15, Fig S3, Fig S14 (in order of production).  
 
-** All outputs from the Marine Ecosystem Models and standardized forcing variables from Earth System Models are made available via ISI-MIP (see: https://www.isimip.org/gettingstarted/data-access/). Please *NOTE* that ISI-MIP team is currently checking and editing the format of some MEMs output files. This means scripts in steps 2 to 4 will need editing to read these files. We are updating the scripts as these files reach the final stage and become ready for publication.    
+## Keywords
+climate change, marine ecosystem models, risk, FishMIP, structural uncertainty, Central Arctic Ocean
 
-*** Temporary RData files are saved in a separate folder not part of this GitHub repository for space limits - here called ../CMIP5vsCMIP6_data/temp_data/ and automatically created by each master script
+## Files and folders organization:
 
-**** Figures are saved in a separate folder not part of this GitHub repository for space limits - here called ../CMIP5vsCMIP6_data/figures/ and automatically created by each master script
 
-**** Additional scripts are Funcs_maps.r, which creates maps of environmental data and ocean biomass, and HelperScripts.r which includes functions to extract and average information from ESMs and MEMs' netcdfs. 
+
+## Data
