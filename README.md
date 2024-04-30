@@ -27,6 +27,8 @@ Julia G. Mason,1 Andrea Bryndum-Buchholz2, Juliano Palacios-Abrantes3, Renuka Ba
 ## Keywords
 climate change, marine ecosystem models, risk, FishMIP, structural uncertainty, Central Arctic Ocean
 
+[![DOI](https://zenodo.org/badge/620382561.svg)](https://zenodo.org/doi/10.5281/zenodo.11094224)
+
 ## Files and folders organization:
 
 In this repository you will find all of the code related to the manuscript Key uncertainties and modeling needs for managing living marine resources in the future Arctic 
