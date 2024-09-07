@@ -1,11 +1,18 @@
 # Key uncertainties and modeling needs for managing living marine resources in the future Arctic 
 
-This repository is intended to support the project *Key uncertainties and modeling needs for managing living marine resources in the future Arctic* currently under revission
+This repository containes the main code and data outputs for the manuscript *Key uncertainties and modeling needs for managing living marine resources in the future Arctic* published on the journal *Earth's Future* in 2024. Publication reference:
+
+Mason, J. G., Bryndum-Buchholz, A., Palacios-Abrantes, J., Badhe, R., Morgante, I., Bianchi, D., Blanchard, J. L., Everett, J. D., Harrison, C. S., Heneghan, R. F., Novaglio, C. and Petrik, C. M., 2024. Key Uncertainties and Modeling Needs for Managing Living Marine Resources in the Future Arctic Ocean. *Earth’s Future*, 12 (8).
+
+Data and code also available for download at Zenodo:
+
+[![DOI](https://zenodo.org/badge/620382561.svg)](https://zenodo.org/doi/10.5281/zenodo.11094224)
 
 
 ## Authors 
 
 Julia G. Mason,1 Andrea Bryndum-Buchholz2, Juliano Palacios-Abrantes3, Renuka Badhe4, Isabella Morgante3, Daniele Bianchi5, Julia L. Blanchard6,7, Jason D. Everett8,9,10, Cheryl S. Harrison11, Ryan F. Heneghan12, Camilla Novaglio6,7, Colleen M. Petrik13
+
 
 **Author affiliations**
 
@@ -27,8 +34,6 @@ Julia G. Mason,1 Andrea Bryndum-Buchholz2, Juliano Palacios-Abrantes3, Renuka Ba
 ## Keywords
 climate change, marine ecosystem models, risk, FishMIP, structural uncertainty, Central Arctic Ocean
 
-[![DOI](https://zenodo.org/badge/620382561.svg)](https://zenodo.org/doi/10.5281/zenodo.11094224)
-
 ## Files and folders organization:
 
 In this repository you will find all of the code related to the manuscript Key uncertainties and modeling needs for managing living marine resources in the future Arctic 
@@ -46,3 +51,5 @@ In this repository you will find all of the code related to the manuscript Key u
 ## Data
 
 Model output data used for this analysis can be extracted from FishMIP, available at (https://www.isimip.org/about/marine-ecosystems-fisheries/). Outputs for ESMs can be found in the ISIMIP website (https://data.isimip.org/). Polygons for the Arctic Large Marine Ecoregions were extracted from Protection Of The Marine Environment-PAME (https://pame.is/projects/ecosystem-approach/arctic-large-marine-ecosystems-lme-s)
+
+*This repository has been archived and is no longer updated. The master branch contains the most updated version. You can dowload the V1 zip file to reproduce paper's figures and analyses. Septemebr of 2024*
